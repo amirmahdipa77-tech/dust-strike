@@ -28,6 +28,28 @@
 
     <!-- ================= HUD ================= -->
     <div id="hud" class="hidden">
+      <div id="roundBar" class="hidden">
+        <div class="teamScore t"><span>T</span><b id="scoreT">0</b></div>
+        <div class="roundMid">
+          <div id="roundTimer">1:55</div>
+          <div id="roundNo">ROUND 1</div>
+        </div>
+        <div class="teamScore ct"><b id="scoreCT">0</b><span>CT</span></div>
+      </div>
+
+      <div id="bombBar" class="hidden">
+        <div class="bombTag">C4</div>
+        <div class="bombTime" id="bombTime">40</div>
+        <div class="prog"><i id="defuseBar"></i></div>
+      </div>
+
+      <div id="plantBar" class="hidden">
+        <span>PLANTING</span>
+        <div class="prog"><i id="plantFill"></i></div>
+      </div>
+
+      <div id="money" class="hidden">$800</div>
+
       <div id="topbar">
         <div class="pill" id="scorePill">
           <div class="scoreRow">
@@ -83,6 +105,7 @@
       <button id="btn-crouch" class="tbtn small">C</button>
       <button id="btn-scope" class="tbtn small">SCOPE</button>
       <button id="btn-swap" class="tbtn small">SWAP</button>
+      <button id="btn-use" class="tbtn small hidden">USE</button>
     </div>
 
     <!-- ================= SCREENS ================= -->
@@ -91,8 +114,17 @@
         <div class="tag">v2 · dust · mobile</div>
         <h1>DUST<span>STRIKE</span></h1>
         <p class="sub">Deploy into dust2 — clear the sites, hold mid.</p>
-        <button id="btn-play" class="big">DEPLOY · OFFLINE</button>
-        <button id="btn-multiplayer" class="big alt">MULTIPLAYER</button>
+        <div class="profileCard">
+          <div class="pcLevel"><span>LV</span><b id="pcLevel">1</b></div>
+          <div class="pcInfo">
+            <div class="pcName" id="pcName">player</div>
+            <div class="pcXp"><i id="pcXpBar"></i></div>
+            <div class="pcXpText" id="pcXpText">0 / 500 XP</div>
+          </div>
+        </div>
+        <button id="btn-competitive" class="big">COMPETITIVE · BOMB</button>
+        <button id="btn-play" class="big alt">DEATHMATCH · BOTS</button>
+        <button id="btn-multiplayer" class="big alt2">MULTIPLAYER</button>
         <button id="btn-settings-start" class="ghost">SETTINGS</button>
         <div class="hints">
           <div><b>MOVE</b> left thumb</div>
@@ -111,6 +143,7 @@
         <button id="btn-resume" class="big">RESUME</button>
         <button id="btn-settings-pause" class="ghost">SETTINGS</button>
         <button id="btn-restart" class="ghost">RESTART MATCH</button>
+        <button id="btn-buy-pause" class="ghost hidden">BUY MENU</button>
         <button id="btn-leave" class="ghost hidden">LEAVE SERVER</button>
       </div>
     </div>
@@ -127,6 +160,25 @@
           <button id="btn-settings-reset" class="ghost">RESET DEFAULTS</button>
         </div>
       </div>
+    </div>
+
+    <div id="buy" class="overlay hidden">
+      <div class="panel buyPanel">
+        <div class="settingsHead">
+          <div>
+            <div class="tag" style="margin:0">buy phase</div>
+            <h2>BUY MENU</h2>
+          </div>
+          <div class="buyMoney" id="buyMoney">$800</div>
+        </div>
+        <div class="buyGrid" id="buyGrid"></div>
+        <div class="buyHint">Press <b>B</b> during freeze time · weapons unlock as you level up</div>
+      </div>
+    </div>
+
+    <div id="roundBanner" class="hidden">
+      <div class="rbTitle" id="rbTitle">ROUND 1</div>
+      <div class="rbSub" id="rbSub"></div>
     </div>
 
     <div id="dead" class="overlay hidden">

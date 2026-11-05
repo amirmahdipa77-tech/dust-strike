@@ -1393,3 +1393,336 @@ input[type="range"]::-moz-range-thumb {
   left: auto;
   right: calc(14px + env(safe-area-inset-right));
 }
+
+/* ==================== PROFILE / MODES ==================== */
+.profileCard {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 14px;
+  margin-bottom: 14px;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid var(--line);
+  text-align: left;
+}
+.pcLevel {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  width: 46px;
+  height: 46px;
+  border-radius: 12px;
+  background: linear-gradient(180deg, rgba(255, 181, 69, 0.28), rgba(255, 181, 69, 0.1));
+  border: 1px solid rgba(255, 181, 69, 0.45);
+}
+.pcLevel span {
+  font-size: 7.5px;
+  letter-spacing: 0.2em;
+  color: rgba(233, 217, 182, 0.6);
+}
+.pcLevel b {
+  font-size: 17px;
+  font-weight: 900;
+  color: var(--amber);
+  line-height: 1;
+}
+.pcInfo {
+  flex: 1;
+  min-width: 0;
+}
+.pcName {
+  font-size: 12.5px;
+  font-weight: 700;
+  color: #fff4e0;
+  margin-bottom: 5px;
+}
+.pcXp {
+  height: 4px;
+  border-radius: 2px;
+  background: rgba(255, 255, 255, 0.1);
+  overflow: hidden;
+}
+.pcXp i {
+  display: block;
+  height: 100%;
+  width: 0%;
+  background: linear-gradient(90deg, var(--amber), #ffd89a);
+  transition: width 400ms ease-out;
+}
+.pcXpText {
+  font-size: 8.5px;
+  letter-spacing: 0.12em;
+  color: rgba(233, 217, 182, 0.4);
+  margin-top: 4px;
+}
+.big.alt2 {
+  background: linear-gradient(180deg, #3f8a6d, #256a51);
+  color: #f2fff9;
+  box-shadow: 0 8px 24px rgba(37, 106, 81, 0.28);
+  margin-top: 9px;
+}
+
+/* ==================== ROUND HUD ==================== */
+#roundBar {
+  position: absolute;
+  top: calc(8px + env(safe-area-inset-top));
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 12px;
+  border-radius: 12px;
+  background: rgba(10, 8, 4, 0.55);
+  border: 1px solid var(--line);
+  backdrop-filter: blur(10px);
+}
+.teamScore {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 9px;
+  letter-spacing: 0.16em;
+  font-weight: 800;
+}
+.teamScore.t span {
+  color: #e0a75a;
+}
+.teamScore.ct span {
+  color: #7ab0e0;
+}
+.teamScore b {
+  font-size: 19px;
+  font-weight: 900;
+  color: #fff;
+  min-width: 16px;
+  text-align: center;
+}
+.roundMid {
+  text-align: center;
+  padding: 0 10px;
+  border-left: 1px solid var(--line);
+  border-right: 1px solid var(--line);
+}
+#roundTimer {
+  font-size: 15px;
+  font-weight: 800;
+  color: #fff;
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
+}
+#roundNo {
+  font-size: 7.5px;
+  letter-spacing: 0.2em;
+  color: rgba(233, 217, 182, 0.45);
+  margin-top: 3px;
+}
+
+#bombBar {
+  position: absolute;
+  top: calc(64px + env(safe-area-inset-top));
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 5px 12px;
+  border-radius: 10px;
+  background: rgba(120, 20, 10, 0.55);
+  border: 1px solid rgba(255, 90, 60, 0.5);
+  backdrop-filter: blur(8px);
+  animation: bombPulse 1s infinite;
+}
+@keyframes bombPulse {
+  50% {
+    box-shadow: 0 0 16px rgba(255, 70, 40, 0.55);
+  }
+}
+.bombTag {
+  font-size: 8px;
+  font-weight: 900;
+  letter-spacing: 0.2em;
+  color: #ff8a72;
+  border: 1px solid rgba(255, 138, 114, 0.6);
+  border-radius: 4px;
+  padding: 2px 4px;
+}
+.bombTime {
+  font-size: 15px;
+  font-weight: 900;
+  color: #fff;
+  font-variant-numeric: tabular-nums;
+}
+#bombBar .prog {
+  width: 60px;
+  height: 4px;
+  border-radius: 2px;
+  background: rgba(0, 0, 0, 0.5);
+  overflow: hidden;
+}
+#bombBar .prog i {
+  display: block;
+  height: 100%;
+  width: 0%;
+  background: #5ad1ff;
+}
+
+#plantBar {
+  position: absolute;
+  left: 50%;
+  top: calc(50% + 60px);
+  transform: translateX(-50%);
+  width: 170px;
+  text-align: center;
+}
+#plantBar span {
+  font-size: 8.5px;
+  letter-spacing: 0.22em;
+  color: var(--amber);
+}
+#plantBar .prog {
+  margin-top: 5px;
+  height: 5px;
+  border-radius: 3px;
+  background: rgba(0, 0, 0, 0.55);
+  overflow: hidden;
+  border: 1px solid rgba(255, 181, 69, 0.3);
+}
+#plantBar .prog i {
+  display: block;
+  height: 100%;
+  width: 0%;
+  background: var(--amber);
+}
+
+#money {
+  position: absolute;
+  left: calc(20px + env(safe-area-inset-left));
+  bottom: calc(78px + env(safe-area-inset-bottom));
+  font-size: 13px;
+  font-weight: 800;
+  color: #7ce0a0;
+  letter-spacing: 0.06em;
+  text-shadow: 0 2px 8px rgba(0, 0, 0, 0.9);
+}
+.lefty #money {
+  left: auto;
+  right: calc(20px + env(safe-area-inset-right));
+}
+
+/* ==================== ROUND BANNER ==================== */
+#roundBanner {
+  position: fixed;
+  left: 50%;
+  top: 26%;
+  transform: translateX(-50%);
+  text-align: center;
+  z-index: 11;
+  pointer-events: none;
+  animation: rbIn 260ms ease-out;
+}
+@keyframes rbIn {
+  from {
+    opacity: 0;
+    transform: translate(-50%, -8px);
+  }
+}
+.rbTitle {
+  font-size: 26px;
+  font-weight: 900;
+  letter-spacing: 0.14em;
+  color: #fff6e3;
+  text-shadow: 0 6px 30px rgba(255, 150, 40, 0.4);
+}
+.rbSub {
+  font-size: 11px;
+  letter-spacing: 0.2em;
+  color: rgba(233, 217, 182, 0.6);
+  margin-top: 4px;
+}
+
+/* ==================== BUY MENU ==================== */
+.panel.buyPanel {
+  max-width: 640px;
+  text-align: left;
+}
+.buyMoney {
+  font-size: 16px;
+  font-weight: 900;
+  color: #7ce0a0;
+  font-variant-numeric: tabular-nums;
+}
+.buyGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+  gap: 8px;
+  margin: 6px 0 12px;
+}
+.buyItem {
+  padding: 11px 12px;
+  border-radius: 11px;
+  border: 1px solid var(--line);
+  background: rgba(255, 255, 255, 0.035);
+  cursor: pointer;
+  text-align: left;
+  font-family: inherit;
+  transition: background 120ms, border-color 120ms, transform 90ms;
+}
+.buyItem:active {
+  transform: scale(0.98);
+}
+.buyItem:hover {
+  border-color: rgba(255, 181, 69, 0.5);
+  background: rgba(255, 181, 69, 0.08);
+}
+.buyItem .biName {
+  font-size: 12px;
+  font-weight: 800;
+  color: #fff4e0;
+}
+.buyItem .biPrice {
+  font-size: 10.5px;
+  font-weight: 700;
+  color: #7ce0a0;
+  margin-top: 3px;
+}
+.buyItem .biNote {
+  font-size: 9px;
+  color: rgba(233, 217, 182, 0.4);
+  margin-top: 3px;
+  letter-spacing: 0.06em;
+}
+.buyItem.owned {
+  border-color: rgba(124, 224, 160, 0.55);
+  background: rgba(124, 224, 160, 0.1);
+}
+.buyItem.locked {
+  opacity: 0.42;
+  cursor: not-allowed;
+}
+.buyItem.poor .biPrice {
+  color: #ff7a63;
+}
+.buyHint {
+  font-size: 9.5px;
+  letter-spacing: 0.06em;
+  color: rgba(233, 217, 182, 0.35);
+}
+.buyHint b {
+  color: var(--amber);
+}
+
+#btn-use {
+  right: calc(204px + env(safe-area-inset-right));
+  bottom: calc(222px + env(safe-area-inset-bottom));
+  width: 60px;
+  height: 60px;
+  font-size: 9px;
+  border-color: rgba(255, 181, 69, 0.6);
+}
+.lefty #btn-use {
+  right: auto;
+  left: calc(204px + env(safe-area-inset-left));
+}

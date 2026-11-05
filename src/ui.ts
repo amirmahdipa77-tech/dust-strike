@@ -271,3 +271,65 @@ export function wireSettingsPanel(ui: SettingsUI): void {
   });
   void ui;
 }
+
+// ---------------------------------------------------------------- buy menu
+export interface BuyOption {
+  id: string;
+  name: string;
+  price: number;
+  note: string;
+  minLevel: number;
+}
+
+export const BUY_OPTIONS: BuyOption[] = [
+  { id: 'ak', name: 'AK-47', price: 2700, note: '36 dmg · 600 rpm', minLevel: 1 },
+  { id: 'm4', name: 'M4A1', price: 3100, note: '33 dmg · 666 rpm', minLevel: 2 },
+  { id: 'awp', name: 'AWP', price: 4750, note: '115 dmg · scope', minLevel: 3 },
+  { id: 'usp', name: 'USP-S', price: 200, note: 'sidearm', minLevel: 1 },
+  { id: 'ammo', name: 'FULL AMMO', price: 300, note: 'refill reserve', minLevel: 1 },
+];
+
+export class BuyMenu {
+  private el = document.getElementById('buy') as HTMLElement;
+  private grid = document.getElementById('buyGrid') as HTMLElement;
+  private moneyEl = document.getElementById('buyMoney') as HTMLElement;
+
+  constructor(
+    private onBuy: (id: string) => void,
+    private onClose: () => void,
+  ) {
+    document.getElementById('btn-buy-close')?.addEventListener('click', () => this.close());
+  }
+
+  get isOpen(): boolean {
+    return !this.el.classList.contains('hidden');
+  }
+
+  open(money: number, equipped: string, level: number): void {
+    this.moneyEl.textContent = `$${money}`;
+    this.grid.innerHTML = '';
+    for (const item of BUY_OPTIONS) {
+      const locked = level < item.minLevel;
+      const owned = item.id === equipped;
+      const poor = money < item.price;
+
+      const b = document.createElement('button');
+      b.className = 'buyItem' + (owned ? ' owned' : '') + (locked ? ' locked' : '') + (poor && !owned ? ' poor' : '');
+      b.innerHTML = `
+        <div class="biName">${item.name}</div>
+        <div class="biPrice">${owned ? 'EQUIPPED' : locked ? `LV ${item.minLevel} REQUIRED` : `$${item.price}`}</div>
+        <div class="biNote">${item.note}</div>`;
+      b.onclick = () => {
+        if (locked || owned) return;
+        this.onBuy(item.id);
+      };
+      this.grid.appendChild(b);
+    }
+    this.el.classList.remove('hidden');
+  }
+
+  close(): void {
+    this.el.classList.add('hidden');
+    this.onClose();
+  }
+}

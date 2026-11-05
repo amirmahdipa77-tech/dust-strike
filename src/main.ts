@@ -8,12 +8,14 @@ import { BotManager } from './bots';
 import { NavGrid } from './nav';
 import { HUD } from './hud';
 import { SFX } from './audio';
-import { SettingsUI } from './ui';
+import { SettingsUI, BuyMenu, BUY_OPTIONS } from './ui';
 import { settings, onSettingsChange, resetSettings } from './settings';
 import { Net } from './net';
 import { Lobby } from './lobby';
 import { RemotePlayers } from './remote';
 import { Minimap } from './minimap';
+import { Rounds, SITES } from './rounds';
+import { progress, addXp, isUnlocked, levelFor, xpInLevel, saveProgress } from './progress';
 
 type State = 'menu' | 'playing' | 'paused' | 'dead' | 'won' | 'settings' | 'lobby' | 'online';
 
@@ -245,6 +247,8 @@ let kills = 0;
 let deadTimer = 0;
 let menuAngle = 0;
 let online = false;
+let mode: 'dm' | 'comp' = 'dm';
+const rounds = new Rounds();
 let inputAccum = 0;
 let scoreboardOpen = false;
 
@@ -271,6 +275,12 @@ const el = {
   netInfo: document.getElementById('netInfo') as HTMLElement,
   sbToggle: document.getElementById('sbToggle') as HTMLElement,
   leave: document.getElementById('btn-leave') as HTMLElement,
+  useBtn: document.getElementById('btn-use') as HTMLElement,
+  buyPauseBtn: document.getElementById('btn-buy-pause') as HTMLElement,
+  pcLevel: document.getElementById('pcLevel') as HTMLElement,
+  pcName: document.getElementById('pcName') as HTMLElement,
+  pcXpBar: document.getElementById('pcXpBar') as HTMLElement,
+  pcXpText: document.getElementById('pcXpText') as HTMLElement,
 };
 
 function show(node: HTMLElement, on: boolean): void {
@@ -289,6 +299,9 @@ function setState(s: State): void {
   show(el.lobby, s === 'lobby');
   show(el.win, s === 'won');
   show(el.sbToggle, s === 'online');
+  show(el.useBtn, s === 'playing' && mode === 'comp');
+  show(el.buyPauseBtn, s === 'paused' && mode === 'comp');
+  hud.showMoney(mode === 'comp' && (s === 'playing' || s === 'dead'));
   show(minimapEl, settings.showMinimap && (s === 'playing' || s === 'online' || s === 'dead'));
   show(el.leave, s === 'paused' && online);
   show(el.netInfo, s === 'online');
@@ -325,6 +338,11 @@ function startMatch(): void {
   player.respawn(map.playerSpawn);
   bots.reset(player.pos);
   el.goalHint.textContent = String(settings.targetKills);
+  hud.setRound(false, 0, 0, 0, '');
+  hud.showMoney(false);
+  hud.setBomb(false, 0, 0);
+  hud.setPlant(0);
+  show(el.useBtn, false);
   setState('playing');
 }
 
@@ -463,6 +481,116 @@ function escapeHtml(s: string): string {
   return s.replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]!);
 }
 
+// ---------------------------------------------------------------- competitive
+let buyOpen = false;
+
+function updateProfileCard(): void {
+  const xp = xpInLevel(progress.xp);
+  el.pcLevel.textContent = String(progress.level);
+  el.pcName.textContent = progress.name;
+  el.pcXpBar.style.width = `${xp.pct}%`;
+  el.pcXpText.textContent = `${xp.current} / ${xp.needed} XP · LV ${progress.level}`;
+}
+
+function grantXp(amount: number): void {
+  const before = progress.level;
+  const levelled = addXp(amount);
+  if (levelled) {
+    const unlocked = progress.level === 2 ? 'M4A1 UNLOCKED' : progress.level === 3 ? 'AWP UNLOCKED' : 'KEEP GOING';
+    hud.banner(`LEVEL ${progress.level}`, unlocked, 3000);
+    sfx.kill();
+  }
+  void before;
+  updateProfileCard();
+}
+
+const buy = new BuyMenu(
+  (id) => {
+    const opt = BUY_OPTIONS.find((o) => o.id === id);
+    if (!opt) return;
+    if (!rounds.spend(opt.price)) return;
+    if (id === 'ammo') {
+      weapon.refill();
+    } else {
+      weapon.equip(id as WeaponId, true);
+    }
+    buy.close();
+  },
+  () => {
+    buyOpen = false;
+    input.setEnabled(state === 'playing' || state === 'online');
+  },
+);
+
+function openBuy(): void {
+  if (mode !== 'comp' || rounds.phase !== 'freeze') return;
+  buyOpen = true;
+  buy.open(rounds.money, weapon.current, progress.level);
+  input.setEnabled(false);
+}
+
+function closeBuy(): void {
+  if (buyOpen) buy.close();
+}
+
+function spawnRound(): void {
+  weapon.refill();
+  weapon.equip('usp', true);
+  player.respawn(map.playerSpawn);
+  player.health = 100;
+  hud.setHealth(100);
+  bots.reset(player.pos);
+  bots.bombTarget = null;
+  remotes.clear();
+}
+
+function startCompetitive(): void {
+  sfx.init();
+  mode = 'comp';
+  online = false;
+  kills = 0;
+  bots.setCount(Math.max(3, settings.botCount));
+  botMeshes = bots.meshes;
+  remotes.clear();
+  rounds.resetMatch();
+  hud.reset(0);
+  hud.showMoney(true);
+  show(el.useBtn, true);
+  spawnRound();
+  setState('playing');
+  hud.banner(`ROUND ${rounds.round}`, 'buy time · press B', 2600);
+}
+
+rounds.hooks = {
+  onRoundStart: (n) => {
+    spawnRound();
+    hud.banner(`ROUND ${n}`, rounds.scoreT + ' : ' + rounds.scoreCT, 2000);
+    if (mode === 'comp') setTimeout(() => openBuy(), 260);
+  },
+  onRoundEnd: (winner, reason, sT, sCT) => {
+    hud.banner(winner === 'T' ? 'TERRORISTS WIN' : 'COUNTER-TERRORISTS WIN', reason, 3200);
+    hud.feed(`<b>${winner}</b> · ${reason} · ${sT}:${sCT}`);
+  },
+  onMatchEnd: (winner) => {
+    el.winStats.textContent = `${winner === 'T' ? 'Terrorists' : 'Counter-Terrorists'} won · ${rounds.scoreT}:${rounds.scoreCT}`;
+    setState('won');
+    grantXp(150);
+  },
+  onPlant: () => {
+    sfx.beep(true);
+    hud.banner('BOMB PLANTED', 'defend it for 40 seconds', 2200);
+    grantXp(60);
+  },
+  onExplode: () => {
+    sfx.hurt();
+    hud.banner('BOMB EXPLODED', '', 2400);
+  },
+  onDefuse: () => {
+    hud.banner('BOMB DEFUSED', '', 2200);
+  },
+  onBeep: (fast) => sfx.beep(fast),
+};
+
 // ---------------------------------------------------------------- settings
 const settingsUI = new SettingsUI(() => {
   applySettings();
@@ -495,6 +623,7 @@ const tmpVec = new THREE.Vector3();
 function playerShoot(): { fired: boolean; hit: string | null } {
   if (!player.alive) return { fired: false, hit: null };
   if (state !== 'playing' && state !== 'online') return { fired: false, hit: null };
+  if (mode === 'comp' && rounds.phase !== 'live') return { fired: false, hit: null };
   if (weapon.reloading) return { fired: false, hit: null };
   if (!weapon.canFire) {
     if (weapon.mag === 0) sfx.empty();
@@ -544,6 +673,10 @@ function playerShoot(): { fired: boolean; hit: string | null } {
       spawnSparks(end, 3);
       if (killed) {
         kills++;
+        if (mode === 'comp') {
+          rounds.addMoney(600);
+          grantXp(25);
+        }
         hud.setKills(kills, settings.targetKills);
         hud.feed(`<b>YOU</b>&nbsp; ${def.name}&nbsp; ${part === 'head' ? 'HEADSHOT' : 'ELIMINATED'}`);
         sfx.kill();
@@ -596,9 +729,13 @@ function onBotShoot(from: THREE.Vector3, to: THREE.Vector3): void {
     sfx.hurt();
     hud.setHealth(player.health);
     if (died) {
-      deadTimer = 3.2;
-      setState('dead');
-      hud.feed(`<b>BOT</b>&nbsp; AK-47&nbsp; YOU`);
+      if (mode === 'comp') {
+        hud.banner('ELIMINATED', 'round continues', 2600);
+      } else {
+        deadTimer = 3.2;
+        setState('dead');
+        hud.feed(`<b>BOT</b>&nbsp; AK-47&nbsp; YOU`);
+      }
     }
   }
 }
@@ -739,6 +876,42 @@ function animate(): void {
         net.sendInput(player.pos.x, player.pos.y, player.pos.z, player.yaw, player.pitch, player.speed > 0.6);
       }
     } else {
+      if (mode === 'comp') {
+        const botOnBomb =
+          rounds.bombPlanted &&
+          bots.bots.some(
+            (b) => b.alive && Math.hypot(b.pos.x - rounds.bombX, b.pos.z - rounds.bombZ) < 1.6,
+          );
+        bots.bombTarget = rounds.bombPlanted ? { x: rounds.bombX, z: rounds.bombZ } : null;
+
+        rounds.tick(dt, {
+          playerAlive: player.alive,
+          playerPos: player.pos,
+          botsAlive: bots.aliveCount,
+          botOnBomb,
+          botDefusing: botOnBomb,
+        });
+
+        if (rounds.phase === 'live' && !rounds.bombPlanted && input.useHeld && player.alive) {
+          rounds.plant(dt, player.pos, true);
+        }
+        if (input.buyPressed) {
+          input.buyPressed = false;
+          if (rounds.phase === 'freeze') {
+            if (buyOpen) closeBuy();
+            else openBuy();
+          }
+        }
+        if (rounds.phase !== 'freeze' && buyOpen) closeBuy();
+
+        hud.setRound(true, rounds.scoreT, rounds.scoreCT, rounds.round, rounds.roundTimer);
+        hud.setBomb(rounds.bombPlanted, rounds.bombTimer, rounds.defuseProgress);
+        hud.setPlant(rounds.plantProgress);
+        hud.setMoney(rounds.money);
+      } else {
+        hud.setRound(false, 0, 0, 0, '');
+      }
+
       bots.update(dt, player, map.colliders, onBotShoot);
       hud.setHealth(player.health);
     }
@@ -777,6 +950,8 @@ function animate(): void {
 
 // ---------------------------------------------------------------- wiring
 document.getElementById('btn-play')?.addEventListener('click', startMatch);
+document.getElementById('btn-competitive')?.addEventListener('click', startCompetitive);
+document.getElementById('btn-buy-pause')?.addEventListener('click', () => openBuy());
 document.getElementById('btn-multiplayer')?.addEventListener('click', () => {
   setState('lobby');
   lobby.show();
@@ -827,6 +1002,11 @@ document.addEventListener('gesturestart', (e) => e.preventDefault());
   map,
   net,
   remotes,
+  rounds,
+  get mode() {
+    return mode;
+  },
+  openBuy,
   shoot: playerShoot,
   startMatch,
   get state() {
@@ -841,5 +1021,6 @@ bots.reset(map.playerSpawn);
 player.respawn(map.playerSpawn);
 applySettings();
 el.goalHint.textContent = String(settings.targetKills);
+updateProfileCard();
 setState('menu');
 animate();

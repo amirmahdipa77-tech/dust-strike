@@ -58,6 +58,7 @@ export class Bot {
   private walkPhase = 0;
   private deadT = 0;
   private flashTimer = 0;
+  goal: { x: number; z: number } | null = null;
   private radius = 0.42;
   private height = 1.85;
 
@@ -225,10 +226,15 @@ export class Bot {
         mz = (dx / dist) * this.strafeDir;
       }
     } else {
+      const tx = this.goal ? this.goal.x : player.pos.x;
+      const tz = this.goal ? this.goal.z : player.pos.z;
       this.pathTimer -= dt;
       if (this.pathTimer <= 0 || this.path.length === 0) {
-        this.path = this.nav.findPath(this.pos.x, this.pos.z, player.pos.x, player.pos.z);
+        this.path = this.nav.findPath(this.pos.x, this.pos.z, tx, tz);
         this.pathTimer = 0.9 + Math.random() * 0.6;
+      }
+      if (this.goal && Math.hypot(this.goal.x - this.pos.x, this.goal.z - this.pos.z) < 1.2) {
+        this.path.length = 0;
       }
       while (
         this.path.length > 0 &&
@@ -327,6 +333,7 @@ export class BotManager {
   private spawns: THREE.Vector3[];
   private nav: NavGrid;
   terrain: (x: number, z: number) => number = () => 0;
+  bombTarget: { x: number; z: number } | null = null;
 
   constructor(scene: THREE.Scene, spawns: THREE.Vector3[], count: number, nav: NavGrid) {
     this.scene = scene;
@@ -370,6 +377,7 @@ export class BotManager {
     colliders: Collider[],
     onShoot: (from: THREE.Vector3, to: THREE.Vector3) => void,
   ): void {
+    for (const b of this.bots) b.goal = this.bombTarget;
     for (const b of this.bots) b.update(dt, player, colliders, onShoot, this.terrain);
 
     for (let i = 0; i < this.bots.length; i++) {

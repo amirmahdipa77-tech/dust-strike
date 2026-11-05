@@ -13,8 +13,10 @@ export class Input {
   joystickScale = 1;
   leftHanded = false;
   zoomHeld = false;
+  useHeld = false;
   switchRequest: number | null = null;
   cycleRequest = 0;
+  buyPressed = false;
 
   private keys = new Set<string>();
   private stickId = -1;
@@ -154,6 +156,7 @@ export class Input {
     hold('btn-fire', () => (this.firing = true), () => (this.firing = false));
     hold('btn-scope', () => (this.zoomHeld = true), () => (this.zoomHeld = false));
     hold('btn-swap', () => (this.cycleRequest = 1));
+    hold('btn-use', () => (this.useHeld = true), () => (this.useHeld = false));
     hold('btn-jump', () => (this.jumpPressed = true));
     hold('btn-reload', () => (this.reloadPressed = true));
     hold(
@@ -179,12 +182,15 @@ export class Input {
       if (k === 'Digit3') this.switchRequest = 3;
       if (k === 'Digit4') this.switchRequest = 4;
       if (k === 'KeyQ') this.cycleRequest = -1;
+      if (k === 'KeyE') this.useHeld = true;
+      if (k === 'KeyB') this.buyPressed = true;
       if (k === 'KeyC' || k === 'ControlLeft') this.crouching = true;
       if (k === 'Escape') this.onPause();
     });
     window.addEventListener('keyup', (e) => {
       this.keys.delete(e.code);
       if (e.code === 'KeyC' || e.code === 'ControlLeft') this.crouching = false;
+      if (e.code === 'KeyE') this.useHeld = false;
     });
     window.addEventListener('blur', () => this.keys.clear());
   }

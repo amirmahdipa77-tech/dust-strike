@@ -1,10 +1,23 @@
-# DUST STRIKE — v5
+# DUST STRIKE — v6
 
 A light, fast CS-style mobile FPS in **TypeScript + Three.js**, packaged for Android with **Capacitor** and built by **GitHub Actions**.
 
 - **Engine:** Three.js (WebGL), no game-engine runtime — ~600 KB of JS, zero external assets
 - **Shell:** Capacitor 7 → Android (landscape, immersive fullscreen)
 - **APK:** built automatically on every push to `main` (and attached to releases on tags)
+
+## Competitive mode (v6)
+
+The real CS loop, playable solo against bots:
+
+- **Rounds**: 6 s freeze time → 1:55 round. First to **8 rounds** wins the match.
+- **Bomb**: you carry C4 as T. Hold **E** (or the USE button) inside A or B for 3.2 s to plant. The fuse runs 40 s and beeps faster as it burns down. CT bots path to the bomb and defuse it in 7.5 s — you have to hold the site.
+- **Win conditions**: bomb explodes or all CTs dead → T round; bomb defused, you die before planting, or time out → CT round.
+- **Economy**: start with $800, +$600 per kill, +$2200 round win / +$1400 loss. Buy between rounds with **B**.
+- **Buy menu**: AK-47 $2700 · M4A1 $3100 · AWP $4750 · USP-S $200 · full ammo $300.
+- **Progression**: XP for kills (+25), plants (+60) and match wins (+150). Levels unlock weapons — M4A1 at level 2, AWP at level 3 — and everything is saved on the device.
+
+Deathmatch (endless, 15 kills) and multiplayer are still there from the menu.
 
 ## Map (v5)
 

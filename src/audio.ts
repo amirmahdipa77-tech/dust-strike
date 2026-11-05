@@ -92,6 +92,10 @@ export class SFX {
     this.burst(0.2, 0.06, 3000, 2, 'bandpass');
     setTimeout(() => this.burst(0.25, 0.08, 1800, 2, 'bandpass'), 260);
   }
+  beep(fast = false): void {
+    this.tone(fast ? 1320 : 880, fast ? 0.06 : 0.09, 0.12, 'square');
+  }
+
   empty(): void {
     this.burst(0.15, 0.04, 4000, 3, 'bandpass');
   }

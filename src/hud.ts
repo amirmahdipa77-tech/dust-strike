@@ -26,6 +26,22 @@ export class HUD {
   private partEl = document.getElementById('dmgPart') as HTMLElement;
   private slots = [...document.querySelectorAll<HTMLElement>('#weaponSlots .slot')];
   private partTimer = 0;
+  private roundBar = document.getElementById('roundBar') as HTMLElement;
+  private scoreT = document.getElementById('scoreT') as HTMLElement;
+  private scoreCT = document.getElementById('scoreCT') as HTMLElement;
+  private roundTimerEl = document.getElementById('roundTimer') as HTMLElement;
+  private roundNo = document.getElementById('roundNo') as HTMLElement;
+  private bombBar = document.getElementById('bombBar') as HTMLElement;
+  private bombTimeEl = document.getElementById('bombTime') as HTMLElement;
+  private defuseBar = document.getElementById('defuseBar') as HTMLElement;
+  private plantBar = document.getElementById('plantBar') as HTMLElement;
+  private plantFill = document.getElementById('plantFill') as HTMLElement;
+  private moneyEl = document.getElementById('money') as HTMLElement;
+  private bannerEl = document.getElementById('roundBanner') as HTMLElement;
+  private rbTitle = document.getElementById('rbTitle') as HTMLElement;
+  private rbSub = document.getElementById('rbSub') as HTMLElement;
+  private bannerTimer = 0;
+  private scorePill = document.getElementById('scorePill') as HTMLElement;
   private wlabel = document.querySelector('.wlabel') as HTMLElement;
 
   private last = { hp: -1, mag: -1, reserve: -1, kills: -1, fps: -1, reloading: false };
@@ -89,6 +105,44 @@ export class HUD {
       this.kills.textContent = String(n);
       this.kbar.style.width = `${Math.min(100, (n / target) * 100)}%`;
     }
+  }
+
+  setRound(visible: boolean, sT: number, sCT: number, round: number, timer: string): void {
+    this.roundBar.classList.toggle('hidden', !visible);
+    this.scorePill.classList.toggle('hidden', visible);
+    if (!visible) return;
+    this.scoreT.textContent = String(sT);
+    this.scoreCT.textContent = String(sCT);
+    this.roundTimerEl.textContent = timer;
+    this.roundNo.textContent = `ROUND ${round}`;
+  }
+
+  setBomb(visible: boolean, timer: number, defuse: number): void {
+    this.bombBar.classList.toggle('hidden', !visible);
+    if (!visible) return;
+    this.bombTimeEl.textContent = String(Math.max(0, Math.ceil(timer)));
+    this.defuseBar.style.width = `${Math.min(100, defuse * 100)}%`;
+  }
+
+  setPlant(pct: number): void {
+    const on = pct > 0.01;
+    this.plantBar.classList.toggle('hidden', !on);
+    if (on) this.plantFill.style.width = `${Math.min(100, pct * 100)}%`;
+  }
+
+  setMoney(v: number): void {
+    this.moneyEl.textContent = `$${v}`;
+  }
+
+  showMoney(on: boolean): void {
+    this.moneyEl.classList.toggle('hidden', !on);
+  }
+
+  banner(title: string, sub: string, ms = 2400): void {
+    this.rbTitle.textContent = title;
+    this.rbSub.textContent = sub;
+    this.bannerEl.classList.remove('hidden');
+    this.bannerTimer = ms / 1000;
   }
 
   setWeaponSlot(slot: number): void {
@@ -172,6 +226,10 @@ export class HUD {
     if (this.partTimer > 0) {
       this.partTimer -= dt;
       if (this.partTimer <= 0) this.partEl.classList.remove('on');
+    }
+    if (this.bannerTimer > 0) {
+      this.bannerTimer -= dt;
+      if (this.bannerTimer <= 0) this.bannerEl.classList.add('hidden');
     }
   }
 
