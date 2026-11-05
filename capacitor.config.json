@@ -1,0 +1,11 @@
+{
+  "appId": "com.duststrike.game",
+  "appName": "Dust Strike",
+  "webDir": "dist",
+  "android": {
+    "backgroundColor": "#151109"
+  },
+  "server": {
+    "androidScheme": "https"
+  }
+}
