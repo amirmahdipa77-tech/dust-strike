@@ -47,8 +47,9 @@
         <div class="wlabel">AK-47 <span id="reloading" class="hidden">· RELOADING</span></div>
       </div>
 
-      <div id="stats"><span id="fps">60 FPS</span></div>
+      <div id="stats"><span id="fps">60 FPS</span><span id="netInfo" class="hidden"></span></div>
       <div id="feed"></div>
+      <button id="sbToggle" class="hidden">SCORE</button>
       <button id="btn-pause" aria-label="pause">
         <i></i><i></i>
       </button>
@@ -69,7 +70,8 @@
         <div class="tag">v2 · dust · mobile</div>
         <h1>DUST<span>STRIKE</span></h1>
         <p class="sub">Deploy into dust2 — clear the sites, hold mid.</p>
-        <button id="btn-play" class="big">DEPLOY</button>
+        <button id="btn-play" class="big">DEPLOY · OFFLINE</button>
+        <button id="btn-multiplayer" class="big alt">MULTIPLAYER</button>
         <button id="btn-settings-start" class="ghost">SETTINGS</button>
         <div class="hints">
           <div><b>MOVE</b> left thumb</div>
@@ -88,6 +90,7 @@
         <button id="btn-resume" class="big">RESUME</button>
         <button id="btn-settings-pause" class="ghost">SETTINGS</button>
         <button id="btn-restart" class="ghost">RESTART MATCH</button>
+        <button id="btn-leave" class="ghost hidden">LEAVE SERVER</button>
       </div>
     </div>
 
@@ -120,6 +123,43 @@
         <p class="sub" id="winstats">15 kills</p>
         <button id="btn-again" class="big">PLAY AGAIN</button>
         <button id="btn-settings-win" class="ghost">SETTINGS</button>
+      </div>
+    </div>
+
+    <div id="scoreboard" class="hidden">
+      <div class="sbPanel">
+        <div class="sbHead">
+          <div>
+            <div class="tag" style="margin:0">server</div>
+            <div id="sbRoom" class="sbRoom">—</div>
+          </div>
+          <div id="sbMeta" class="sbMeta">0 / 0</div>
+        </div>
+        <div class="sbCols"><span>PLAYER</span><span>K</span><span>D</span></div>
+        <div id="sbRows"></div>
+      </div>
+    </div>
+
+    <div id="lobby" class="overlay hidden">
+      <div class="panel lobby">
+        <div class="settingsHead">
+          <div>
+            <div class="tag" style="margin:0">multiplayer</div>
+            <h2>SERVER BROWSER</h2>
+          </div>
+          <button id="btn-lobby-close" class="close">✕</button>
+        </div>
+
+        <div class="netBar">
+          <input id="playerName" class="textInput nameInput" maxlength="16" placeholder="callsign" />
+          <input id="serverUrl" class="textInput" placeholder="ws://your-server:8080/ws" />
+          <button id="btn-connect" class="mini">CONNECT</button>
+        </div>
+        <div id="netStatus" class="netStatus" data-state="offline">not connected</div>
+        <div class="netHint">Point this at your own server: deploy <b>server/</b> (Render · Fly · Railway · Docker) and paste the <b>wss://</b> address here. Same address = same server list.</div>
+
+        <div class="tabs" id="lobbyTabs"></div>
+        <div class="tabBody" id="lobbyBody"></div>
       </div>
     </div>
 

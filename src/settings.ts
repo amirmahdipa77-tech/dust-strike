@@ -32,6 +32,10 @@ export interface Settings {
   masterVolume: number; // 0 .. 1
   botCount: number; // 2 .. 6
   targetKills: number; // 5 .. 30
+
+  // multiplayer
+  playerName: string;
+  serverUrl: string;
 }
 
 export const DEFAULTS: Settings = {
@@ -60,6 +64,9 @@ export const DEFAULTS: Settings = {
   masterVolume: 0.6,
   botCount: 4,
   targetKills: 15,
+
+  playerName: 'player',
+  serverUrl: 'ws://localhost:8080/ws',
 };
 
 const KEY = 'duststrike.settings.v2';
@@ -92,6 +99,8 @@ function clampAll(s: Settings): Settings {
     masterVolume: n(s.masterVolume, 0, 1, 0.6),
     botCount: Math.round(n(s.botCount, 2, 6, 4)),
     targetKills: Math.round(n(s.targetKills, 5, 30, 15)),
+    playerName: typeof s.playerName === 'string' && s.playerName.trim() ? s.playerName.slice(0, 16) : 'player',
+    serverUrl: typeof s.serverUrl === 'string' ? s.serverUrl : 'ws://localhost:8080/ws',
   };
 }
 

@@ -1,10 +1,45 @@
-# DUST STRIKE — v2
+# DUST STRIKE — v3
 
 A light, fast CS-style mobile FPS in **TypeScript + Three.js**, packaged for Android with **Capacitor** and built by **GitHub Actions**.
 
 - **Engine:** Three.js (WebGL), no game-engine runtime — ~600 KB of JS, zero external assets
 - **Shell:** Capacitor 7 → Android (landscape, immersive fullscreen)
 - **APK:** built automatically on every push to `main` (and attached to releases on tags)
+
+## Multiplayer (v3)
+
+Real online play with **Create Server / Join Server**:
+
+- **Create Server** — spin up a room with a name, max players and kill target. It gets a 4-letter code.
+- **Join Server** — browse live servers (players, map, kill target) and tap to join, or type the code in *Direct Join*.
+- Teams (T / CT) are auto-balanced, everyone spawns at their side, and the scoreboard (TAB or the SCORE button) shows K/D per player.
+- 20 Hz state sync with client-side interpolation, server-side hit registration, respawns and match win.
+
+The client talks to any server you point it at: paste the `wss://` address into the lobby and it becomes your server list.
+
+### Run the server locally
+
+```bash
+cd server
+npm install
+npm start          # ws://localhost:8080/ws   (health: /health, rooms: /rooms)
+```
+
+Then in the game: **MULTIPLAYER → server address `ws://localhost:8080/ws` → CONNECT**.
+On a phone use your computer's LAN IP, e.g. `ws://192.168.1.20:8080/ws` — same Wi-Fi, no deploy needed.
+
+### Deploy it (so friends anywhere can join)
+
+| Host | How |
+| --- | --- |
+| **Render** | New → Blueprint → pick this repo. `render.yaml` is included. |
+| **Fly.io** | `cd server && fly launch --copy-config && fly deploy` |
+| **Railway** | New project → Deploy from repo → `railway.json` handles the Dockerfile. |
+| **Any VPS** | `docker build -t dust ./server && docker run -p 8080:8080 dust` |
+
+Once deployed, open `https://your-app.onrender.com/health` — if it answers, put `wss://your-app.onrender.com/ws` into the lobby.
+
+> The server is a relay with light validation (rate-limited fire, clamped positions, server-applied damage). It is **not** cheat-proof — a real competitive build needs server-authoritative movement and lag compensation.
 
 ## What's new in v2
 

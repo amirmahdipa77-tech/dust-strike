@@ -10,8 +10,11 @@ import { HUD } from './hud';
 import { SFX } from './audio';
 import { SettingsUI } from './ui';
 import { settings, onSettingsChange, resetSettings } from './settings';
+import { Net } from './net';
+import { Lobby } from './lobby';
+import { RemotePlayers } from './remote';
 
-type State = 'menu' | 'playing' | 'paused' | 'dead' | 'won' | 'settings';
+type State = 'menu' | 'playing' | 'paused' | 'dead' | 'won' | 'settings' | 'lobby' | 'online';
 
 const SENS_TOUCH = 0.0032;
 const SENS_MOUSE = 0.0022;
@@ -39,13 +42,11 @@ scene.fog = new THREE.Fog(SKY_HORIZON, 42, 118);
 const camera = new THREE.PerspectiveCamera(settings.fov, window.innerWidth / window.innerHeight, 0.05, 220);
 scene.add(camera);
 
-const hemi = new THREE.HemisphereLight(0xfffaf0, 0xb3a486, 1.25);
-scene.add(hemi);
+scene.add(new THREE.HemisphereLight(0xfffaf0, 0xb3a486, 1.25));
 const sun = new THREE.DirectionalLight(0xfff6e2, 1.25);
 sun.position.set(38, 62, 24);
 scene.add(sun);
 
-// gradient sky dome
 {
   const skyGeo = new THREE.SphereGeometry(200, 20, 14);
   const pos = skyGeo.attributes.position;
@@ -75,14 +76,10 @@ scene.add(sun);
 const map = buildMap();
 scene.add(map.mesh);
 
-// distant ground so the horizon is not empty
 {
   const g = new THREE.PlaneGeometry(400, 400);
   g.rotateX(-Math.PI / 2);
-  const ground = new THREE.Mesh(
-    g,
-    new THREE.MeshLambertMaterial({ color: 0xb59d74, fog: true }),
-  );
+  const ground = new THREE.Mesh(g, new THREE.MeshLambertMaterial({ color: 0xb59d74 }));
   ground.position.y = -0.15;
   scene.add(ground);
 }
@@ -94,6 +91,9 @@ camera.add(weapon.group);
 const nav = new NavGrid({ grid: map.walkable, min: MAP_MIN, size: MAP_SIZE, cell: CELL });
 const bots = new BotManager(scene, map.botSpawns, settings.botCount, nav);
 let botMeshes = bots.meshes;
+
+const remotes = new RemotePlayers(scene);
+const net = new Net();
 
 const hud = new HUD();
 const sfx = new SFX();
@@ -121,8 +121,7 @@ particles.frustumCulled = false;
 scene.add(particles);
 let pCursor = 0;
 
-function spawnSparks(at: THREE.Vector3, count = 5, color?: THREE.Color): void {
-  void color;
+function spawnSparks(at: THREE.Vector3, count = 5): void {
   for (let i = 0; i < count; i++) {
     const idx = pCursor;
     pCursor = (pCursor + 1) % MAX_PARTICLES;
@@ -195,7 +194,7 @@ class TracerPool {
     }
   }
 }
-const tracers = new TracerPool(scene, 12);
+const tracers = new TracerPool(scene, 14);
 
 // ---------------------------------------------------------------- dust motes
 const moteCount = 300;
@@ -226,7 +225,9 @@ let prevState: State = 'menu';
 let kills = 0;
 let deadTimer = 0;
 let menuAngle = 0;
-let lastLook = { x: 0, y: 0 };
+let online = false;
+let inputAccum = 0;
+let scoreboardOpen = false;
 
 const input = new Input(canvas, () => togglePause());
 const raycaster = new THREE.Raycaster();
@@ -240,9 +241,17 @@ const el = {
   deadTimer: document.getElementById('deadtimer') as HTMLElement,
   pause: document.getElementById('pause') as HTMLElement,
   settings: document.getElementById('settings') as HTMLElement,
+  lobby: document.getElementById('lobby') as HTMLElement,
   win: document.getElementById('win') as HTMLElement,
   winStats: document.getElementById('winstats') as HTMLElement,
   goalHint: document.getElementById('goalHint') as HTMLElement,
+  scoreboard: document.getElementById('scoreboard') as HTMLElement,
+  sbRoom: document.getElementById('sbRoom') as HTMLElement,
+  sbMeta: document.getElementById('sbMeta') as HTMLElement,
+  sbRows: document.getElementById('sbRows') as HTMLElement,
+  netInfo: document.getElementById('netInfo') as HTMLElement,
+  sbToggle: document.getElementById('sbToggle') as HTMLElement,
+  leave: document.getElementById('btn-leave') as HTMLElement,
 };
 
 function show(node: HTMLElement, on: boolean): void {
@@ -251,15 +260,26 @@ function show(node: HTMLElement, on: boolean): void {
 
 function setState(s: State): void {
   state = s;
-  show(el.hud, s === 'playing' || s === 'dead');
-  show(el.touch, s === 'playing');
+  const inGame = s === 'playing' || s === 'online' || s === 'dead';
+  show(el.hud, inGame);
+  show(el.touch, s === 'playing' || s === 'online');
   show(el.start, s === 'menu');
   show(el.dead, s === 'dead');
   show(el.pause, s === 'paused');
   show(el.settings, s === 'settings');
+  show(el.lobby, s === 'lobby');
   show(el.win, s === 'won');
-  input.setEnabled(s === 'playing');
-  if (s !== 'playing' && document.pointerLockElement === canvas) document.exitPointerLock?.();
+  show(el.sbToggle, s === 'online');
+  show(el.leave, s === 'paused' && online);
+  show(el.netInfo, s === 'online');
+  if (s !== 'online') {
+    scoreboardOpen = false;
+    show(el.scoreboard, false);
+  }
+  input.setEnabled(s === 'playing' || s === 'online');
+  if (s !== 'playing' && s !== 'online' && document.pointerLockElement === canvas) {
+    document.exitPointerLock?.();
+  }
 }
 
 function openSettings(): void {
@@ -273,9 +293,11 @@ function closeSettings(): void {
 
 function startMatch(): void {
   sfx.init();
+  online = false;
   kills = 0;
   bots.setCount(settings.botCount);
   botMeshes = bots.meshes;
+  remotes.clear();
   hud.reset(settings.targetKills);
   hud.setKills(0, settings.targetKills);
   hud.setHealth(100);
@@ -287,11 +309,141 @@ function startMatch(): void {
 }
 
 function togglePause(): void {
-  if (state === 'playing') setState('paused');
-  else if (state === 'paused') setState('playing');
+  if (state === 'playing' || state === 'online') setState('paused');
+  else if (state === 'paused') setState(online ? 'online' : 'playing');
 }
 
-// ---------------------------------------------------------------- settings wiring
+// ---------------------------------------------------------------- multiplayer
+const lobby = new Lobby(net, () => undefined, () => setState('menu'));
+
+net.onJoined = (spawn) => {
+  sfx.init();
+  online = true;
+  kills = 0;
+  bots.setCount(0);
+  botMeshes = [];
+  remotes.clear();
+  hud.reset(net.room?.kills ?? settings.targetKills);
+  hud.setKills(0, net.room?.kills ?? settings.targetKills);
+  hud.setHealth(100);
+  weapon.refill();
+  player.respawn(new THREE.Vector3(spawn.x, 0, spawn.z));
+  player.yaw = spawn.yaw;
+  setState('online');
+  hud.feed(`<b>JOINED</b> ${net.room?.name ?? ''} · code ${net.room?.id ?? ''}`);
+};
+
+net.onPlayers = () => {
+  remotes.sync([...net.players.values()], net.id);
+  const self = net.players.get(net.id);
+  if (self) {
+    hud.setHealth(self.hp);
+    hud.setKills(self.kills, net.room?.kills ?? settings.targetKills);
+    if (!self.alive && state === 'online') {
+      setState('dead');
+      deadTimer = 3;
+    }
+    if (self.alive && state === 'dead') {
+      setState('online');
+    }
+  }
+  const count = net.players.size;
+  el.netInfo.textContent = `${count} PLAYER${count === 1 ? '' : 'S'} · ${net.ping}ms`;
+  if (scoreboardOpen) renderScoreboard();
+};
+
+net.onShot = (msg) => {
+  const from = new THREE.Vector3(msg.from.x, msg.from.y, msg.from.z);
+  const to = new THREE.Vector3(msg.to.x, msg.to.y, msg.to.z);
+  if (msg.by !== net.id) {
+    tracers.fire(from, to);
+    remotes.flash(msg.by);
+    sfx.botShot();
+  }
+};
+
+net.onDamage = (msg) => {
+  if (msg.target === net.id) {
+    hud.damage(null);
+    sfx.hurt();
+  }
+  if (msg.by === net.id) {
+    hud.hit(false);
+    sfx.hit();
+  }
+};
+
+net.onKill = (msg) => {
+  const killer = net.players.get(msg.killer);
+  const victim = net.players.get(msg.victim);
+  if (msg.killer === net.id) {
+    hud.hit(true);
+    sfx.kill();
+    hud.feed(`<b>YOU</b>&nbsp; ${msg.head ? 'HEADSHOT' : 'ELIMINATED'} ${victim?.name ?? ''}`);
+  } else if (msg.victim === net.id) {
+    hud.feed(`<b>${killer?.name ?? ''}</b>&nbsp; ELIMINATED YOU`);
+  } else {
+    hud.feed(`<b>${killer?.name ?? ''}</b> → ${victim?.name ?? ''}`);
+  }
+};
+
+net.onRespawn = (spawn) => {
+  weapon.refill();
+  player.respawn(new THREE.Vector3(spawn.x, 0, spawn.z));
+  player.yaw = spawn.yaw;
+  hud.setHealth(100);
+  if (state === 'dead') setState('online');
+};
+
+net.onMatchOver = (msg) => {
+  el.winStats.textContent = `${msg.name} reached ${msg.kills} kills`;
+  setState('won');
+};
+
+net.onStatus = () => {
+  lobby.refreshStatus();
+  if (net.status === 'error' && online) {
+    online = false;
+    setState('menu');
+    hud.feed(`<b>DISCONNECTED</b> ${net.lastError}`);
+  }
+};
+
+function leaveServer(): void {
+  net.leaveRoom();
+  net.close();
+  online = false;
+  remotes.clear();
+  setState('menu');
+}
+
+function renderScoreboard(): void {
+  if (!net.room) return;
+  el.sbRoom.textContent = `${net.room.name} · ${net.room.id}`;
+  el.sbMeta.textContent = `${net.players.size} / ${net.room.max} · ${net.room.kills} kills to win`;
+  const rows = [...net.players.values()].sort((a, b) => b.kills - a.kills || a.deaths - b.deaths);
+  el.sbRows.innerHTML = '';
+  for (const p of rows) {
+    const row = document.createElement('div');
+    row.className = 'sbRow' + (p.id === net.id ? ' me' : '') + (p.alive ? '' : ' dead');
+    row.innerHTML = `<div><span class="sbTeam ${p.team}">${p.team}</span>${escapeHtml(p.name)}</div>
+      <div class="k">${p.kills}</div><div class="d">${p.deaths}</div>`;
+    el.sbRows.appendChild(row);
+  }
+}
+
+function toggleScoreboard(): void {
+  if (state !== 'online') return;
+  scoreboardOpen = !scoreboardOpen;
+  show(el.scoreboard, scoreboardOpen);
+  if (scoreboardOpen) renderScoreboard();
+}
+
+function escapeHtml(s: string): string {
+  return s.replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]!);
+}
+
+// ---------------------------------------------------------------- settings
 const settingsUI = new SettingsUI(() => {
   applySettings();
   settingsUI.refreshAll();
@@ -307,7 +459,7 @@ function applySettings(): void {
   input.joystickScale = settings.joystickScale;
   input.leftHanded = settings.leftHanded;
   document.body.classList.toggle('lefty', settings.leftHanded);
-  if (bots.bots.length !== settings.botCount) {
+  if (!online && bots.bots.length !== settings.botCount) {
     bots.setCount(settings.botCount);
     botMeshes = bots.meshes;
   }
@@ -320,7 +472,8 @@ const tmpDir = new THREE.Vector3();
 const tmpVec = new THREE.Vector3();
 
 function playerShoot(): { fired: boolean; hit: string | null } {
-  if (!player.alive || state !== 'playing') return { fired: false, hit: null };
+  if (!player.alive) return { fired: false, hit: null };
+  if (state !== 'playing' && state !== 'online') return { fired: false, hit: null };
   if (weapon.reloading) return { fired: false, hit: null };
   if (!weapon.canFire) {
     if (weapon.mag === 0) sfx.empty();
@@ -332,23 +485,27 @@ function playerShoot(): { fired: boolean; hit: string | null } {
 
   const origin = camera.position.clone();
   camera.getWorldDirection(tmpDir);
-  const spread =
-    0.003 + Math.min(0.028, player.speed * 0.0021) + (player.onGround ? 0 : 0.018);
+  const spread = 0.003 + Math.min(0.028, player.speed * 0.0021) + (player.onGround ? 0 : 0.018);
   tmpDir.x += (Math.random() - 0.5) * spread;
   tmpDir.y += (Math.random() - 0.5) * spread;
   tmpDir.z += (Math.random() - 0.5) * spread;
   tmpDir.normalize();
 
   raycaster.set(origin, tmpDir);
-  const hits = raycaster.intersectObjects([map.mesh, ...botMeshes], false);
+  const targets = online ? [map.mesh, ...remotes.meshes] : [map.mesh, ...botMeshes];
+  const hits = raycaster.intersectObjects(targets, false);
 
   let end: THREE.Vector3;
+  let hitId: string | null = null;
+  let head = false;
+
   if (hits.length > 0) {
     const hit = hits[0];
     end = hit.point.clone();
-    const ud = hit.object.userData as { bot?: any; part?: string };
-    if (ud && ud.bot) {
-      const head = ud.part === 'head';
+    const ud = hit.object.userData as { bot?: any; remoteId?: string; part?: string };
+
+    if (ud?.bot) {
+      head = ud.part === 'head';
       const killed = ud.bot.takeDamage(head ? 120 : 34);
       hud.hit(killed);
       sfx.hit();
@@ -363,6 +520,10 @@ function playerShoot(): { fired: boolean; hit: string | null } {
           setState('won');
         }
       }
+    } else if (ud?.remoteId && online) {
+      head = ud.part === 'head';
+      hitId = ud.remoteId;
+      spawnSparks(end, 3);
     } else {
       spawnSparks(end, 4);
     }
@@ -373,7 +534,11 @@ function playerShoot(): { fired: boolean; hit: string | null } {
   const muzzle = weapon.group.localToWorld(weapon.muzzleLocal.clone());
   tracers.fire(muzzle, end);
 
-  return { fired: true, hit: hits.length > 0 ? 'hit' : null };
+  if (online) {
+    net.sendShot(hitId, { x: end.x, y: end.y, z: end.z }, hitId ? (head ? 120 : 34) : 0, head);
+  }
+
+  return { fired: true, hit: hitId };
 }
 
 function damageAngle(from: THREE.Vector3): number {
@@ -432,15 +597,43 @@ function updateMenuCamera(dt: number): void {
   weapon.group.visible = false;
 }
 
+function stepCombat(dt: number): void {
+  const look = input.consumeLook();
+  const sens = ('ontouchstart' in window ? SENS_TOUCH : SENS_MOUSE) * settings.sensitivity;
+  player.applyLook(look.x, look.y, sens, settings.invertY);
+
+  input.sample();
+  player.update(dt, input, map.colliders);
+
+  weapon.update({
+    dt,
+    speed: player.speed,
+    onGround: player.onGround,
+    crouch: player.crouching,
+    lookDX: look.x,
+    lookDY: look.y,
+    landed: player.landed,
+  });
+  weapon.group.visible = true;
+
+  if (input.consumeReload()) weapon.startReload();
+  if (input.firing) playerShoot();
+
+  player.syncCamera(camera, weapon.recoilPitch, weapon.shake);
+  camera.updateMatrixWorld(true);
+
+  hud.setAmmo(weapon.mag, weapon.reserve, weapon.reloading);
+  hud.setSpread(2 + weapon.kick * 8 + Math.min(7, player.speed * 0.85));
+}
+
 function animate(): void {
   requestAnimationFrame(animate);
   const now = performance.now();
   const dt = Math.min((now - lastT) / 1000, 0.05);
   lastT = now;
 
-  const realNow = performance.now();
-  const realDt = (realNow - lastRealT) / 1000;
-  lastRealT = realNow;
+  const realDt = (now - lastRealT) / 1000;
+  lastRealT = now;
   fpsAccum += realDt;
   fpsFrames++;
   if (fpsAccum >= 0.5) {
@@ -448,7 +641,7 @@ function animate(): void {
     fpsAccum = 0;
     fpsFrames = 0;
     hud.setFps(fpsValue);
-    if (state === 'playing' && fpsValue < 40 && currentPR > basePR * 0.62) {
+    if ((state === 'playing' || state === 'online') && fpsValue < 40 && currentPR > basePR * 0.62) {
       slowTime += 0.5;
       if (slowTime > 2) {
         currentPR = Math.max(basePR * 0.6, currentPR - 0.22);
@@ -460,57 +653,46 @@ function animate(): void {
     }
   }
 
-  if (state === 'menu') {
+  if (state === 'menu' || state === 'lobby') {
     updateMenuCamera(dt);
-  } else if (state === 'playing') {
-    const look = input.consumeLook();
-    lastLook = look;
-    const sens = ('ontouchstart' in window ? SENS_TOUCH : SENS_MOUSE) * settings.sensitivity;
-    player.applyLook(look.x, look.y, sens, settings.invertY);
+  } else if (state === 'playing' || state === 'online') {
+    stepCombat(dt);
 
-    input.sample();
-    player.update(dt, input, map.colliders);
-
-    weapon.update({
-      dt,
-      speed: player.speed,
-      onGround: player.onGround,
-      crouch: player.crouching,
-      lookDX: look.x,
-      lookDY: look.y,
-      landed: player.landed,
-    });
-    weapon.group.visible = true;
-
-    if (input.consumeReload()) weapon.startReload();
-    if (input.firing) playerShoot();
-
-    player.syncCamera(camera, weapon.recoilPitch, weapon.shake);
-    camera.updateMatrixWorld(true);
-
-    bots.update(dt, player, map.colliders, onBotShoot);
-
-    hud.setHealth(player.health);
-    hud.setAmmo(weapon.mag, weapon.reserve, weapon.reloading);
-    hud.setSpread(2 + weapon.kick * 8 + Math.min(7, player.speed * 0.85));
+    if (online) {
+      remotes.update(dt);
+      hud.setHealth(net.players.get(net.id)?.hp ?? player.health);
+      inputAccum += dt;
+      if (inputAccum >= 0.05) {
+        inputAccum = 0;
+        net.sendInput(player.pos.x, player.pos.y, player.pos.z, player.yaw, player.pitch, player.speed > 0.6);
+      }
+    } else {
+      bots.update(dt, player, map.colliders, onBotShoot);
+      hud.setHealth(player.health);
+    }
   } else if (state === 'dead') {
     deadTimer -= dt;
     el.deadTimer.textContent = String(Math.max(0, Math.ceil(deadTimer)));
     player.update(dt, input, map.colliders);
     player.syncCamera(camera, 0, 0);
     weapon.update({ dt, speed: 0, onGround: true, crouch: false, lookDX: 0, lookDY: 0, landed: false });
-    bots.update(dt, player, map.colliders, onBotShoot);
-    if (deadTimer <= 0) {
-      weapon.refill();
-      player.respawn(map.playerSpawn);
-      hud.setHealth(100);
-      setState('playing');
+    if (!online) {
+      bots.update(dt, player, map.colliders, onBotShoot);
+      if (deadTimer <= 0) {
+        weapon.refill();
+        player.respawn(map.playerSpawn);
+        hud.setHealth(100);
+        setState('playing');
+      }
+    } else {
+      remotes.update(dt);
     }
   } else if (state === 'won' || state === 'paused' || state === 'settings') {
     weapon.group.visible = false;
+    if (online) remotes.update(dt);
   }
 
-  if (state !== 'menu') {
+  if (state !== 'menu' && state !== 'lobby') {
     tracers.update(dt);
     updateParticles(dt);
     motes.rotation.y += dt * 0.006;
@@ -518,14 +700,18 @@ function animate(): void {
   }
 
   renderer.render(scene, camera);
-  void lastLook;
 }
 
 // ---------------------------------------------------------------- wiring
 document.getElementById('btn-play')?.addEventListener('click', startMatch);
-document.getElementById('btn-resume')?.addEventListener('click', () => setState('playing'));
-document.getElementById('btn-restart')?.addEventListener('click', startMatch);
-document.getElementById('btn-again')?.addEventListener('click', startMatch);
+document.getElementById('btn-multiplayer')?.addEventListener('click', () => {
+  setState('lobby');
+  lobby.show();
+});
+document.getElementById('btn-resume')?.addEventListener('click', () => setState(online ? 'online' : 'playing'));
+document.getElementById('btn-restart')?.addEventListener('click', () => (online ? leaveServer() : startMatch()));
+document.getElementById('btn-leave')?.addEventListener('click', leaveServer);
+document.getElementById('btn-again')?.addEventListener('click', () => (online ? leaveServer() : startMatch()));
 document.getElementById('btn-settings-start')?.addEventListener('click', openSettings);
 document.getElementById('btn-settings-pause')?.addEventListener('click', openSettings);
 document.getElementById('btn-settings-win')?.addEventListener('click', openSettings);
@@ -535,14 +721,24 @@ document.getElementById('btn-settings-reset')?.addEventListener('click', () => {
   settingsUI.render();
   applySettings();
 });
+el.sbToggle.addEventListener('click', toggleScoreboard);
+
+window.addEventListener('keydown', (e) => {
+  if (e.code === 'Tab') {
+    e.preventDefault();
+    if (!scoreboardOpen) toggleScoreboard();
+  }
+});
+window.addEventListener('keyup', (e) => {
+  if (e.code === 'Tab' && scoreboardOpen) toggleScoreboard();
+});
 
 document.addEventListener('visibilitychange', () => {
-  if (document.hidden && state === 'playing') setState('paused');
+  if (document.hidden && (state === 'playing' || state === 'online')) setState('paused');
 });
 document.addEventListener('contextmenu', (e) => e.preventDefault());
 document.addEventListener('gesturestart', (e) => e.preventDefault());
 
-// perf probe (used by the automated tests)
 (window as any).__renderInfo = () => ({
   calls: renderer.info.render.calls,
   tris: renderer.info.render.triangles,
@@ -550,14 +746,16 @@ document.addEventListener('gesturestart', (e) => e.preventDefault());
   textures: renderer.info.memory.textures,
 });
 
-// debug hook for automated tests
 (window as any).__game = {
   player,
   weapon,
   bots,
   nav,
   map,
+  net,
+  remotes,
   shoot: playerShoot,
+  startMatch,
   get state() {
     return state;
   },

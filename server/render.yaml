@@ -1,0 +1,12 @@
+services:
+  - type: web
+    name: dust-strike-server
+    runtime: node
+    plan: free
+    rootDir: server
+    buildCommand: npm install
+    startCommand: node index.mjs
+    healthCheckPath: /health
+    envVars:
+      - key: PORT
+        value: 8080
