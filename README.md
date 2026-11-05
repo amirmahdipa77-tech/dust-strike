@@ -1,10 +1,27 @@
-# DUST STRIKE — v3
+# DUST STRIKE — v4
 
 A light, fast CS-style mobile FPS in **TypeScript + Three.js**, packaged for Android with **Capacitor** and built by **GitHub Actions**.
 
 - **Engine:** Three.js (WebGL), no game-engine runtime — ~600 KB of JS, zero external assets
 - **Shell:** Capacitor 7 → Android (landscape, immersive fullscreen)
 - **APK:** built automatically on every push to `main` (and attached to releases on tags)
+
+## Weapons (v4)
+
+| Slot | Weapon | Damage (chest) | Notes |
+| --- | --- | --- | --- |
+| 1 | **AK-47** | 36 | 600 rpm, heavy recoil, wood furniture |
+| 2 | **M4A1** | 33 | 666 rpm, flatter recoil |
+| 3 | **AWP** | 115 | bolt action, clean circular scope, 22° zoom |
+| 4 | **USP-S** | 26 | 12-round sidearm, fast to raise |
+
+Damage scales with the body part hit: **head ×4**, stomach ×1.25, chest ×1, legs ×0.72 — an AK headshot (144) or an AWP chest shot (115) ends the round. The HUD tells you what you hit.
+
+Switch with **1–4**, **Q**, the mouse wheel, or the SWAP button; scope with right-click or the SCOPE button (sensitivity drops to 42% while scoped).
+
+## Map (v4)
+
+The grid now carries a **height field**, so the layout has real elevation: the **pit** at long (−1.2 m with stepped entry), the **A-site platform** (+0.6 m), the **B back platform** (+0.9 m), a tunnel step and short-A steps. Walls are extruded below the floor so nothing leaks, and the player/bot physics read terrain height directly.
 
 ## Multiplayer (v3)
 

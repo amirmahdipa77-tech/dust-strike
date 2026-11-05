@@ -13,6 +13,15 @@
   </head>
   <body>
     <canvas id="game"></canvas>
+    <div id="scope" class="hidden">
+      <div class="scopeVignette"></div>
+      <div class="scopeReticle">
+        <i class="v"></i><i class="h"></i>
+        <b class="m m1"></b><b class="m m2"></b><b class="m m3"></b><b class="m m4"></b>
+        <u class="c"></u>
+      </div>
+      <div class="scopeInfo"><span id="scopeMag">10</span> / <span id="scopeRes">30</span></div>
+    </div>
     <div id="vignette"></div>
     <div id="damage"></div>
     <div id="dmg-arrows"></div>
@@ -35,6 +44,7 @@
         <i class="ring"></i>
       </div>
       <div id="hitmarker"></div>
+      <div id="dmgPart"></div>
 
       <div id="vitals">
         <div class="vrow"><span class="vico">✚</span><span id="hp">100</span></div>
@@ -45,6 +55,13 @@
         <div class="ammoRow"><span id="mag">30</span><span id="reserve">90</span></div>
         <div class="magbar"><i id="magbar"></i></div>
         <div class="wlabel">AK-47 <span id="reloading" class="hidden">· RELOADING</span></div>
+      </div>
+
+      <div id="weaponSlots">
+        <div class="slot" data-slot="1"><b>1</b><span>AK-47</span></div>
+        <div class="slot" data-slot="2"><b>2</b><span>M4A1</span></div>
+        <div class="slot" data-slot="3"><b>3</b><span>AWP</span></div>
+        <div class="slot" data-slot="4"><b>4</b><span>USP</span></div>
       </div>
 
       <div id="stats"><span id="fps">60 FPS</span><span id="netInfo" class="hidden"></span></div>
@@ -62,6 +79,8 @@
       <button id="btn-jump" class="tbtn small">JUMP</button>
       <button id="btn-reload" class="tbtn small">R</button>
       <button id="btn-crouch" class="tbtn small">C</button>
+      <button id="btn-scope" class="tbtn small">SCOPE</button>
+      <button id="btn-swap" class="tbtn small">SWAP</button>
     </div>
 
     <!-- ================= SCREENS ================= -->

@@ -38,6 +38,7 @@ export interface MapData {
   mesh: THREE.Mesh;
   colliders: Collider[];
   walkable: Uint8Array;
+  heightAt: (x: number, z: number) => number;
   botSpawns: THREE.Vector3[];
   playerSpawn: THREE.Vector3;
 }
@@ -206,6 +207,8 @@ interface Zone {
   x2: number;
   z2: number;
   floor: number;
+  /** floor height in metres (negative = pit) */
+  y?: number;
 }
 
 const ZONES: Zone[] = [
@@ -237,11 +240,23 @@ const ZONES: Zone[] = [
   { x1: -14, z1: -27, x2: -5, z2: -19, floor: C.sand }, // CT -> B
   // CT spawn
   { x1: -9, z1: -28, x2: 9, z2: -19, floor: C.concrete },
+
+  // ---- elevation: pit, platforms, stairs (later zones win) ----
+  { x1: 20.5, z1: -4, x2: 21.5, z2: 2, floor: C.sandDark, y: -0.4 },
+  { x1: 21.5, z1: -4, x2: 22.5, z2: 2, floor: C.sandDark, y: -0.8 },
+  { x1: 22.5, z1: -4, x2: 28, z2: 2, floor: C.sandDark, y: -1.2 },
+  { x1: 19, z1: -21, x2: 20, z2: -17, floor: C.concrete, y: 0.3 },
+  { x1: 20, z1: -21, x2: 26, z2: -17, floor: C.concrete, y: 0.6 },
+  { x1: -21, z1: -21, x2: -20, z2: -15, floor: C.concrete, y: 0.45 },
+  { x1: -26, z1: -21, x2: -21, z2: -15, floor: C.concrete, y: 0.9 },
+  { x1: -19, z1: 8, x2: -15, z2: 10, floor: C.sandDark, y: 0.35 },
+  { x1: 6, z1: -12, x2: 8, z2: -8, floor: C.sand, y: 0.35 },
 ];
 
 export function buildMap(): MapData {
   const b = new Builder();
   const walkable = new Uint8Array(MAP_SIZE * MAP_SIZE);
+  const heights = new Float32Array(MAP_SIZE * MAP_SIZE);
 
   const cellOf = (v: number) => Math.floor(v - MAP_MIN);
 
@@ -251,7 +266,10 @@ export function buildMap(): MapData {
     const iz0 = Math.max(0, cellOf(z.z1));
     const iz1 = Math.min(MAP_SIZE - 1, cellOf(z.z2) - 1);
     for (let iz = iz0; iz <= iz1; iz++) {
-      for (let ix = ix0; ix <= ix1; ix++) walkable[iz * MAP_SIZE + ix] = 1;
+      for (let ix = ix0; ix <= ix1; ix++) {
+        walkable[iz * MAP_SIZE + ix] = 1;
+        heights[iz * MAP_SIZE + ix] = z.y ?? 0;
+      }
     }
   }
 
@@ -310,13 +328,19 @@ export function buildMap(): MapData {
       if (solidAt(ix, iz)) continue;
       const x0 = MAP_MIN + ix;
       const z0 = MAP_MIN + iz;
+      const y0 = heights[iz * MAP_SIZE + ix];
       const d = Math.min(4, dist[iz * MAP_SIZE + ix]);
       const ao = 0.8 + 0.05 * d;
 
       tmpColor.setHex(zoneColor(ix, iz)).multiplyScalar(ao * (0.97 + Math.random() * 0.06));
 
       const base = floorPos.length / 3;
-      floorPos.push(x0, 0, z0, x0 + 1, 0, z0, x0 + 1, 0, z0 + 1, x0, 0, z0 + 1);
+      floorPos.push(
+        x0, y0, z0,
+        x0 + 1, y0, z0,
+        x0 + 1, y0, z0 + 1,
+        x0, y0, z0 + 1,
+      );
       for (let k = 0; k < 4; k++) floorCol.push(tmpColor.r, tmpColor.g, tmpColor.b);
       floorUv.push(x0 * 0.24, z0 * 0.24, (x0 + 1) * 0.24, z0 * 0.24, (x0 + 1) * 0.24, (z0 + 1) * 0.24, x0 * 0.24, (z0 + 1) * 0.24);
       floorIdx.push(base, base + 2, base + 1, base, base + 3, base + 2);
@@ -368,7 +392,7 @@ export function buildMap(): MapData {
       const x1 = MAP_MIN + ix;
       const z1 = MAP_MIN + iz;
       const col = (ix + iz) % 7 === 0 ? C.stoneLow : C.stone;
-      b.box(x1, z1, x1 + w, z1 + h, 0, WALL_H - 0.35, col, true, 0.2);
+      b.box(x1, z1, x1 + w, z1 + h, -2.5, WALL_H - 0.35, col, true, 0.2);
       b.box(x1, z1, x1 + w, z1 + h, WALL_H - 0.35, WALL_H, C.stoneLow, false, 0.2);
     }
   }
@@ -384,15 +408,13 @@ export function buildMap(): MapData {
   b.crate(15.5, -16.5, 2.2); // default
   b.stacked(19.5, -13.5, 2.2); // double stack
   b.crate(23.5, -19.5, 2.0); // goose
-  b.box(21, -21.6, 25.4, -18.6, 0, 0.35, C.concreteDark);
-  b.box(21.4, -21.6, 25.0, -19.0, 0.35, 0.7, C.concrete);
+
   b.barrel(11.5, -19.5);
   b.barrel(11.5, -18.4);
   b.box(8.4, -22.4, 9.6, -20.4, 0, 1.1, C.concreteDark); // site lip
 
   // ---- B site -------------------------------------------------------
-  b.box(-26.4, -21.4, -21.4, -14.6, 0, 1.05, C.concreteDark); // back plat
-  b.box(-21.4, -21.4, -20.6, -14.6, 0, 0.5, C.concrete); // plat step
+
   b.crate(-17, -12.5, 2.4); // big box
   b.crate(-13.4, -18.5, 2.0);
   b.stacked(-24, -10.5, 2.0);
@@ -434,6 +456,13 @@ export function buildMap(): MapData {
   b.crate(5.5, 25, 2.0);
   b.box(-2.6, 27.2, 2.6, 27.9, 0, 1.0, C.concreteDark);
 
+  // ---- extra cover ----------------------------------------------------
+  b.crate(23.5, 11, 1.8);
+  b.crate(-23.5, 4, 1.8);
+  b.crate(9.5, 2.5, 1.6);
+  b.barrel(16.5, -18.5);
+  b.box(-8.5, -13.2, -7.2, -12.2, 0, 0.9, C.concreteDark);
+
   // ---- assemble -------------------------------------------------------
   const merged = mergeGeometries(b.geos, false)!;
   merged.computeBoundingSphere();
@@ -446,10 +475,19 @@ export function buildMap(): MapData {
   );
   mesh.frustumCulled = false;
 
+  const heightAt = (x: number, z: number): number => {
+    const ix = Math.floor(x - MAP_MIN);
+    const iz = Math.floor(z - MAP_MIN);
+    if (ix < 0 || iz < 0 || ix >= MAP_SIZE || iz >= MAP_SIZE) return 0;
+    const i = iz * MAP_SIZE + ix;
+    return walkable[i] ? heights[i] : 0;
+  };
+
   return {
     mesh,
     colliders: b.colliders,
     walkable,
+    heightAt,
     botSpawns: [
       new THREE.Vector3(0, 0, -24),
       new THREE.Vector3(7, 0, -25),

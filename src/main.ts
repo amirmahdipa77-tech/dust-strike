@@ -3,7 +3,7 @@ import './style.css';
 import { buildMap, MAP_MIN, MAP_SIZE, CELL } from './map';
 import { Player } from './player';
 import { Input } from './input';
-import { Weapon } from './weapon';
+import { Weapons, WEAPONS, BODY_MULT, type BodyPart, type WeaponId } from './weapons';
 import { BotManager } from './bots';
 import { NavGrid } from './nav';
 import { HUD } from './hud';
@@ -85,11 +85,14 @@ scene.add(map.mesh);
 }
 
 const player = new Player();
-const weapon = new Weapon();
+const weapon = new Weapons();
 camera.add(weapon.group);
+
+player.terrain = map.heightAt;
 
 const nav = new NavGrid({ grid: map.walkable, min: MAP_MIN, size: MAP_SIZE, cell: CELL });
 const bots = new BotManager(scene, map.botSpawns, settings.botCount, nav);
+bots.terrain = map.heightAt;
 let botMeshes = bots.meshes;
 
 const remotes = new RemotePlayers(scene);
@@ -480,12 +483,17 @@ function playerShoot(): { fired: boolean; hit: string | null } {
     return { fired: false, hit: null };
   }
 
+  const def = weapon.def;
   weapon.fire();
-  sfx.shot();
+  sfx.shot(def.sound);
 
   const origin = camera.position.clone();
   camera.getWorldDirection(tmpDir);
-  const spread = 0.003 + Math.min(0.028, player.speed * 0.0021) + (player.onGround ? 0 : 0.018);
+  const movePenalty = Math.min(0.03, player.speed * def.moveSpread);
+  const spread =
+    (weapon.zoom ? def.spread * 0.35 : def.spread) +
+    movePenalty +
+    (player.onGround ? 0 : 0.02);
   tmpDir.x += (Math.random() - 0.5) * spread;
   tmpDir.y += (Math.random() - 0.5) * spread;
   tmpDir.z += (Math.random() - 0.5) * spread;
@@ -497,23 +505,29 @@ function playerShoot(): { fired: boolean; hit: string | null } {
 
   let end: THREE.Vector3;
   let hitId: string | null = null;
-  let head = false;
+  let part: BodyPart | null = null;
+  let dmg = 0;
 
   if (hits.length > 0) {
     const hit = hits[0];
     end = hit.point.clone();
-    const ud = hit.object.userData as { bot?: any; remoteId?: string; part?: string };
+    const ud = hit.object.userData as { bot?: any; remoteId?: string; part?: BodyPart };
+
+    if (ud?.part) {
+      part = ud.part;
+      dmg = Math.round(def.dmg * BODY_MULT[part]);
+    }
 
     if (ud?.bot) {
-      head = ud.part === 'head';
-      const killed = ud.bot.takeDamage(head ? 120 : 34);
+      const killed = ud.bot.takeDamage(dmg);
       hud.hit(killed);
+      hud.partHit(part === 'head' ? 'HEADSHOT' : part === 'stomach' ? 'STOMACH' : part === 'leg' ? 'LEGS' : 'CHEST');
       sfx.hit();
       spawnSparks(end, 3);
       if (killed) {
         kills++;
         hud.setKills(kills, settings.targetKills);
-        hud.feed(`<b>YOU</b>&nbsp; AK-47&nbsp; ${head ? 'HEADSHOT' : 'ELIMINATED'}`);
+        hud.feed(`<b>YOU</b>&nbsp; ${def.name}&nbsp; ${part === 'head' ? 'HEADSHOT' : 'ELIMINATED'}`);
         sfx.kill();
         if (kills >= settings.targetKills) {
           el.winStats.textContent = `${kills} kills · ${Math.round(player.health)} HP left`;
@@ -521,8 +535,8 @@ function playerShoot(): { fired: boolean; hit: string | null } {
         }
       }
     } else if (ud?.remoteId && online) {
-      head = ud.part === 'head';
       hitId = ud.remoteId;
+      hud.partHit(part === 'head' ? 'HEADSHOT' : part === 'stomach' ? 'STOMACH' : part === 'leg' ? 'LEGS' : 'CHEST');
       spawnSparks(end, 3);
     } else {
       spawnSparks(end, 4);
@@ -535,7 +549,7 @@ function playerShoot(): { fired: boolean; hit: string | null } {
   tracers.fire(muzzle, end);
 
   if (online) {
-    net.sendShot(hitId, { x: end.x, y: end.y, z: end.z }, hitId ? (head ? 120 : 34) : 0, head);
+    net.sendShot(hitId, { x: end.x, y: end.y, z: end.z }, hitId ? dmg : 0, part === 'head');
   }
 
   return { fired: true, hit: hitId };
@@ -598,8 +612,31 @@ function updateMenuCamera(dt: number): void {
 }
 
 function stepCombat(dt: number): void {
+  // weapon switching
+  if (input.switchRequest !== null) {
+    const wanted = Object.values(WEAPONS).find((w) => w.slot === input.switchRequest);
+    if (wanted) weapon.equip(wanted.id as WeaponId);
+    input.switchRequest = null;
+  }
+  if (input.cycleRequest !== 0) {
+    weapon.cycle(input.cycleRequest);
+    input.cycleRequest = 0;
+  }
+
+  // scope
+  const wantZoom = weapon.def.scope && input.zoomHeld && !weapon.reloading && player.alive;
+  weapon.setZoom(wantZoom);
+  const targetFov = weapon.zoom ? weapon.def.zoomFov ?? settings.fov : settings.fov;
+  if (Math.abs(camera.fov - targetFov) > 0.05) {
+    camera.fov += (targetFov - camera.fov) * Math.min(1, dt * 15);
+    camera.updateProjectionMatrix();
+  }
+  weapon.group.visible = !weapon.zoom;
+  hud.setScope(weapon.zoom);
+
   const look = input.consumeLook();
-  const sens = ('ontouchstart' in window ? SENS_TOUCH : SENS_MOUSE) * settings.sensitivity;
+  const sensMul = weapon.zoom ? 0.42 : 1;
+  const sens = ('ontouchstart' in window ? SENS_TOUCH : SENS_MOUSE) * settings.sensitivity * sensMul;
   player.applyLook(look.x, look.y, sens, settings.invertY);
 
   input.sample();
@@ -623,6 +660,9 @@ function stepCombat(dt: number): void {
   camera.updateMatrixWorld(true);
 
   hud.setAmmo(weapon.mag, weapon.reserve, weapon.reloading);
+  hud.setWeaponSlot(weapon.def.slot);
+  hud.setWeaponName(weapon.def.name);
+  hud.setScopeAmmo(weapon.mag, weapon.reserve);
   hud.setSpread(2 + weapon.kick * 8 + Math.min(7, player.speed * 0.85));
 }
 
@@ -689,6 +729,7 @@ function animate(): void {
     }
   } else if (state === 'won' || state === 'paused' || state === 'settings') {
     weapon.group.visible = false;
+    hud.setScope(false);
     if (online) remotes.update(dt);
   }
 

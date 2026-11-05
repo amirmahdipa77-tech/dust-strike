@@ -30,6 +30,7 @@ export class Bot {
   group = new THREE.Group();
   root = new THREE.Group();
   torso: THREE.Mesh;
+  hips: THREE.Mesh;
   head: THREE.Mesh;
   legL: THREE.Mesh;
   legR: THREE.Mesh;
@@ -68,8 +69,8 @@ export class Bot {
     this.torso = new THREE.Mesh(geo.torso, mat.torso);
     this.torso.position.y = 1.16;
 
-    const hips = new THREE.Mesh(geo.hips, mat.hips);
-    hips.position.y = 0.82;
+    this.hips = new THREE.Mesh(geo.hips, mat.hips);
+    this.hips.position.y = 0.82;
 
     this.legL = new THREE.Mesh(geo.leg, mat.leg);
     this.legL.position.set(-0.13, 0.39, 0);
@@ -105,7 +106,7 @@ export class Bot {
 
     this.root.add(
       this.torso,
-      hips,
+      this.hips,
       this.legL,
       this.legR,
       this.head,
@@ -116,11 +117,12 @@ export class Bot {
     );
     this.group.add(this.root);
 
-    this.torso.userData = { bot: this, part: 'body' };
+    this.torso.userData = { bot: this, part: 'chest' };
+    this.hips.userData = { bot: this, part: 'stomach' };
     this.head.userData = { bot: this, part: 'head' };
-    this.legL.userData = { bot: this, part: 'body' };
-    this.legR.userData = { bot: this, part: 'body' };
-    this.hitMeshes.push(this.torso, this.head, this.legL, this.legR);
+    this.legL.userData = { bot: this, part: 'leg' };
+    this.legR.userData = { bot: this, part: 'leg' };
+    this.hitMeshes.push(this.torso, this.hips, this.head, this.legL, this.legR);
 
     this.group.visible = false;
   }
@@ -171,6 +173,7 @@ export class Bot {
     player: Player,
     colliders: Collider[],
     onShoot: (from: THREE.Vector3, to: THREE.Vector3) => void,
+    terrain: (x: number, z: number) => number = () => 0,
   ): void {
     if (!this.alive) {
       this.deadT = Math.min(1, this.deadT + dt * 2.4);
@@ -258,7 +261,7 @@ export class Bot {
     this.pos.z += this.vel.z * dt;
     resolveCollision(this.pos, this.radius, this.height, colliders);
 
-    const ground = groundHeightAt(this.pos.x, this.pos.z, this.pos.y, colliders);
+    const ground = groundHeightAt(this.pos.x, this.pos.z, this.pos.y, colliders, 0.45, terrain(this.pos.x, this.pos.z));
     if (this.pos.y <= ground + 0.001 && this.vel.y <= 0) {
       this.pos.y = ground;
       this.vel.y = 0;
@@ -323,6 +326,7 @@ export class BotManager {
   private scene: THREE.Scene;
   private spawns: THREE.Vector3[];
   private nav: NavGrid;
+  terrain: (x: number, z: number) => number = () => 0;
 
   constructor(scene: THREE.Scene, spawns: THREE.Vector3[], count: number, nav: NavGrid) {
     this.scene = scene;
@@ -366,7 +370,7 @@ export class BotManager {
     colliders: Collider[],
     onShoot: (from: THREE.Vector3, to: THREE.Vector3) => void,
   ): void {
-    for (const b of this.bots) b.update(dt, player, colliders, onShoot);
+    for (const b of this.bots) b.update(dt, player, colliders, onShoot, this.terrain);
 
     for (let i = 0; i < this.bots.length; i++) {
       const a = this.bots[i];

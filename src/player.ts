@@ -23,6 +23,7 @@ export class Player {
   deathTilt = 0;
   radius = 0.42;
   height = 1.8;
+  terrain: (x: number, z: number) => number = () => 0;
 
   private eyeStand = 1.62;
   private eyeCrouch = 1.05;
@@ -99,7 +100,7 @@ export class Player {
     resolveCollision(this.pos, this.radius, this.height, colliders);
     resolveCollision(this.pos, this.radius, this.height, colliders);
 
-    const ground = groundHeightAt(this.pos.x, this.pos.z, this.pos.y, colliders);
+    const ground = groundHeightAt(this.pos.x, this.pos.z, this.pos.y, colliders, 0.45, this.terrain(this.pos.x, this.pos.z));
     const wasAir = !this.onGround;
     if (this.pos.y <= ground + 0.001 && this.vel.y <= 0) {
       this.pos.y = ground;
@@ -110,7 +111,7 @@ export class Player {
     } else {
       this.onGround = false;
     }
-    if (this.pos.y < 0) {
+    if (this.pos.y < -4) {
       this.pos.y = 0;
       this.vel.y = 0;
       this.onGround = true;

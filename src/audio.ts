@@ -63,9 +63,17 @@ export class SFX {
     o.stop(t + dur + 0.02);
   }
 
-  shot(): void {
-    this.burst(0.55, 0.13, 2400, 0.8);
-    this.tone(150, 0.1, 0.18, 'sawtooth');
+  shot(kind: 'rifle' | 'sniper' | 'pistol' = 'rifle'): void {
+    if (kind === 'sniper') {
+      this.burst(0.75, 0.26, 1700, 0.9);
+      this.tone(90, 0.22, 0.26, 'sawtooth');
+    } else if (kind === 'pistol') {
+      this.burst(0.4, 0.09, 3200, 1.1);
+      this.tone(220, 0.07, 0.13, 'square');
+    } else {
+      this.burst(0.55, 0.13, 2400, 0.8);
+      this.tone(150, 0.1, 0.18, 'sawtooth');
+    }
   }
   botShot(): void {
     this.burst(0.22, 0.11, 1500, 0.7);

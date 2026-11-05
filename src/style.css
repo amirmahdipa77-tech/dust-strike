@@ -42,6 +42,7 @@ body {
   height: 100%;
   display: block;
   touch-action: none;
+  filter: saturate(1.06) contrast(1.04);
 }
 
 .hidden {
@@ -1210,4 +1211,168 @@ input[type="range"]::-moz-range-thumb {
 }
 .netHint b {
   color: rgba(255, 181, 69, 0.7);
+}
+
+/* ==================== WEAPONS / SCOPE ==================== */
+#weaponSlots {
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
+  bottom: calc(14px + env(safe-area-inset-bottom));
+  display: flex;
+  flex-direction: row;
+  gap: 4px;
+  align-items: center;
+}
+.slot {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 8px;
+  border-radius: 8px;
+  border: 1px solid transparent;
+  font-size: calc(9px * var(--hud-scale));
+  letter-spacing: 0.1em;
+  color: rgba(233, 217, 182, 0.35);
+  transition: color 140ms, background 140ms, border-color 140ms;
+}
+.slot b {
+  font-size: calc(8px * var(--hud-scale));
+  opacity: 0.5;
+}
+.slot.active {
+  color: #fff4e0;
+  background: rgba(255, 181, 69, 0.14);
+  border-color: rgba(255, 181, 69, 0.5);
+}
+.slot.active b {
+  color: var(--hud-color);
+  opacity: 1;
+}
+
+#dmgPart {
+  position: absolute;
+  left: 50%;
+  top: calc(50% + 34px);
+  transform: translateX(-50%);
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: 0.18em;
+  color: #ffd479;
+  opacity: 0;
+  text-shadow: 0 2px 8px rgba(0, 0, 0, 0.9);
+  transition: opacity 120ms;
+}
+#dmgPart.on {
+  opacity: 1;
+}
+
+#scope {
+  position: fixed;
+  inset: 0;
+  z-index: 6;
+  pointer-events: none;
+}
+.scopeVignette {
+  position: absolute;
+  inset: 0;
+  background:
+    radial-gradient(circle at 50% 50%, transparent 0 27%, rgba(0, 0, 0, 0.55) 27.5%, rgba(0, 0, 0, 0.98) 33%),
+    radial-gradient(circle at 50% 50%, rgba(120, 160, 200, 0.05) 0 27%, transparent 27.5%);
+}
+.scopeReticle {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 0;
+  height: 0;
+}
+.scopeReticle i {
+  position: absolute;
+  background: rgba(12, 14, 16, 0.92);
+  box-shadow: 0 0 2px rgba(255, 255, 255, 0.15);
+}
+.scopeReticle .v {
+  width: 1.5px;
+  height: 52vh;
+  left: -0.75px;
+  top: -26vh;
+}
+.scopeReticle .h {
+  height: 1.5px;
+  width: 52vh;
+  top: -0.75px;
+  left: -26vh;
+}
+.scopeReticle b {
+  position: absolute;
+  width: 3px;
+  height: 3px;
+  border-radius: 50%;
+  background: rgba(12, 14, 16, 0.92);
+  left: -1.5px;
+}
+.scopeReticle .m1 {
+  top: 34px;
+}
+.scopeReticle .m2 {
+  top: 68px;
+}
+.scopeReticle .m3 {
+  top: 102px;
+}
+.scopeReticle .m4 {
+  top: 136px;
+}
+.scopeReticle .c {
+  position: absolute;
+  width: 7px;
+  height: 7px;
+  left: -3.5px;
+  top: -3.5px;
+  border: 1.5px solid rgba(255, 90, 60, 0.95);
+  border-radius: 50%;
+}
+.scopeInfo {
+  position: absolute;
+  left: 50%;
+  bottom: calc(12% + env(safe-area-inset-bottom));
+  transform: translateX(-50%);
+  font-size: 11px;
+  letter-spacing: 0.2em;
+  color: rgba(233, 217, 182, 0.75);
+  font-variant-numeric: tabular-nums;
+}
+
+#btn-scope {
+  right: calc(132px + env(safe-area-inset-right));
+  bottom: calc(222px + env(safe-area-inset-bottom));
+  width: 60px;
+  height: 60px;
+  font-size: 9px;
+}
+#btn-swap {
+  right: calc(204px + env(safe-area-inset-right));
+  bottom: calc(150px + env(safe-area-inset-bottom));
+  width: 60px;
+  height: 60px;
+  font-size: 9px;
+}
+.lefty #btn-scope {
+  right: auto;
+  left: calc(132px + env(safe-area-inset-left));
+}
+.lefty #btn-swap {
+  right: auto;
+  left: calc(204px + env(safe-area-inset-left));
+}
+.lefty #weaponSlots {
+  right: auto;
+  left: calc(20px + env(safe-area-inset-left));
+  align-items: flex-start;
+}
+
+#hud.scoped #crosshair,
+#hud.scoped #weaponSlots {
+  opacity: 0;
 }

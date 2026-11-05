@@ -20,6 +20,13 @@ export class HUD {
   private reloadEl = document.getElementById('reloading') as HTMLElement;
   private crosshair = document.getElementById('crosshair') as HTMLElement;
   private root = document.getElementById('hud') as HTMLElement;
+  private scopeEl = document.getElementById('scope') as HTMLElement;
+  private scopeMag = document.getElementById('scopeMag') as HTMLElement;
+  private scopeRes = document.getElementById('scopeRes') as HTMLElement;
+  private partEl = document.getElementById('dmgPart') as HTMLElement;
+  private slots = [...document.querySelectorAll<HTMLElement>('#weaponSlots .slot')];
+  private partTimer = 0;
+  private wlabel = document.querySelector('.wlabel') as HTMLElement;
 
   private last = { hp: -1, mag: -1, reserve: -1, kills: -1, fps: -1, reloading: false };
   private hitTimer = 0;
@@ -84,6 +91,36 @@ export class HUD {
     }
   }
 
+  setWeaponSlot(slot: number): void {
+    this.slots.forEach((el) => el.classList.toggle('active', Number(el.dataset.slot) === slot));
+  }
+
+  setScope(on: boolean): void {
+    this.scopeEl.classList.toggle('hidden', !on);
+    this.root.classList.toggle('scoped', on);
+  }
+
+  private lastName = '';
+
+  setWeaponName(name: string): void {
+    if (!this.wlabel || name === this.lastName) return;
+    this.lastName = name;
+    const reload = this.reloadEl.outerHTML;
+    this.wlabel.innerHTML = `${name} ${reload}`;
+    this.reloadEl = document.getElementById('reloading') as HTMLElement;
+  }
+
+  setScopeAmmo(mag: number, res: number): void {
+    this.scopeMag.textContent = String(mag);
+    this.scopeRes.textContent = String(res);
+  }
+
+  partHit(text: string): void {
+    this.partEl.textContent = text;
+    this.partEl.classList.add('on');
+    this.partTimer = 0.5;
+  }
+
   setFps(n: number): void {
     const r = Math.round(n);
     if (r === this.last.fps) return;
@@ -131,6 +168,10 @@ export class HUD {
     if (this.dmgTimer > 0) {
       this.dmgTimer -= dt;
       if (this.dmgTimer <= 0) this.dmgEl.style.opacity = '0';
+    }
+    if (this.partTimer > 0) {
+      this.partTimer -= dt;
+      if (this.partTimer <= 0) this.partEl.classList.remove('on');
     }
   }
 

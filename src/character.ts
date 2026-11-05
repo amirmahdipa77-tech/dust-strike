@@ -43,6 +43,7 @@ export class Character {
   group = new THREE.Group();
   root = new THREE.Group();
   torso: THREE.Mesh;
+  hips: THREE.Mesh;
   head: THREE.Mesh;
   legL: THREE.Mesh;
   legR: THREE.Mesh;
@@ -60,8 +61,8 @@ export class Character {
     this.torso = new THREE.Mesh(geo.torso, mat('torso', pal.torso));
     this.torso.position.y = 1.16;
 
-    const hips = new THREE.Mesh(geo.hips, mat('hips', pal.hips));
-    hips.position.y = 0.82;
+    this.hips = new THREE.Mesh(geo.hips, mat('hips', pal.hips));
+    this.hips.position.y = 0.82;
 
     this.legL = new THREE.Mesh(geo.leg, mat('leg', pal.leg));
     this.legL.position.set(-0.13, 0.39, 0);
@@ -88,12 +89,19 @@ export class Character {
     this.flash.position.set(0.2, 1.14, -0.76);
     this.flash.visible = false;
 
-    this.root.add(this.torso, hips, this.legL, this.legR, this.head, armL, armR, this.gun, this.flash);
+    this.root.add(this.torso, this.hips, this.legL, this.legR, this.head, armL, armR, this.gun, this.flash);
     this.group.add(this.root);
 
-    for (const m of [this.torso, this.head, this.legL, this.legR]) {
-      m.userData = { remoteId: id, part: m === this.head ? 'head' : 'body' };
-      this.hitMeshes.push(m);
+    const parts: [THREE.Mesh, string][] = [
+      [this.torso, 'chest'],
+      [this.hips, 'stomach'],
+      [this.head, 'head'],
+      [this.legL, 'leg'],
+      [this.legR, 'leg'],
+    ];
+    for (const [mesh, part] of parts) {
+      mesh.userData = { remoteId: id, part };
+      this.hitMeshes.push(mesh);
     }
   }
 

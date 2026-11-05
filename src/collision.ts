@@ -61,8 +61,9 @@ export function groundHeightAt(
   feetY: number,
   boxes: Collider[],
   stepUp = 0.45,
+  base = 0,
 ): number {
-  let h = 0;
+  let h = base;
   for (let i = 0; i < boxes.length; i++) {
     const b = boxes[i];
     if (x < b.minX - 0.18 || x > b.maxX + 0.18) continue;

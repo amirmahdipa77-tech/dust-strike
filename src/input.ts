@@ -12,6 +12,9 @@ export class Input {
   sprinting = false;
   joystickScale = 1;
   leftHanded = false;
+  zoomHeld = false;
+  switchRequest: number | null = null;
+  cycleRequest = 0;
 
   private keys = new Set<string>();
   private stickId = -1;
@@ -39,6 +42,7 @@ export class Input {
     if (!v) {
       this.moveX = this.moveY = 0;
       this.firing = false;
+      this.zoomHeld = false;
       this.crouching = false;
       this.stickId = -1;
       this.lookId = -1;
@@ -148,6 +152,8 @@ export class Input {
     };
 
     hold('btn-fire', () => (this.firing = true), () => (this.firing = false));
+    hold('btn-scope', () => (this.zoomHeld = true), () => (this.zoomHeld = false));
+    hold('btn-swap', () => (this.cycleRequest = 1));
     hold('btn-jump', () => (this.jumpPressed = true));
     hold('btn-reload', () => (this.reloadPressed = true));
     hold(
@@ -168,6 +174,11 @@ export class Input {
         e.preventDefault();
       }
       if (k === 'KeyR') this.reloadPressed = true;
+      if (k === 'Digit1') this.switchRequest = 1;
+      if (k === 'Digit2') this.switchRequest = 2;
+      if (k === 'Digit3') this.switchRequest = 3;
+      if (k === 'Digit4') this.switchRequest = 4;
+      if (k === 'KeyQ') this.cycleRequest = -1;
       if (k === 'KeyC' || k === 'ControlLeft') this.crouching = true;
       if (k === 'Escape') this.onPause();
     });
@@ -191,13 +202,20 @@ export class Input {
       }
     });
     document.addEventListener('mousedown', (e) => {
-      if (e.button !== 0 || !this.enabled) return;
+      if (!this.enabled) return;
       if ('ontouchstart' in window) return;
-      this.firing = true;
+      if (e.button === 2) this.zoomHeld = true;
+      if (e.button === 0) this.firing = true;
     });
     document.addEventListener('mouseup', (e) => {
       if (e.button === 0) this.firing = false;
+      if (e.button === 2) this.zoomHeld = false;
     });
+    this.canvas.addEventListener('wheel', (e) => {
+      if (!this.enabled) return;
+      this.cycleRequest = e.deltaY > 0 ? 1 : -1;
+      e.preventDefault();
+    }, { passive: false });
   }
 
   /** Called once per frame before movement: folds keyboard into the analogue values. */
