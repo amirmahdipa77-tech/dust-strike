@@ -24,6 +24,7 @@ const C = {
   sandDark: 0xc6b08b,
   stone: 0xdcc7a4,
   stoneLow: 0xc2ad8a,
+  stoneLight: 0xe4d3b0,
   concrete: 0xa9a49a,
   concreteDark: 0x8e8a80,
   wood: 0x96652f,
@@ -173,6 +174,12 @@ class Builder {
     });
   }
 
+  /** Flat ceiling slab (no collider: bullets still stop, players pass under). */
+  ceiling(x1: number, z1: number, x2: number, z2: number, y: number): void {
+    this.box(x1, z1, x2, z2, y, y + 0.35, C.stone, false, 0.2);
+    this.box(x1, z1, x2, z2, y - 0.06, y, C.stoneLight, false, 0.2);
+  }
+
   /** Wall with a doorway cut into it (used for mid doors / long doors). */
   doorWall(
     x1: number,
@@ -212,46 +219,61 @@ interface Zone {
 }
 
 const ZONES: Zone[] = [
-  // T side
-  { x1: -8, z1: 19, x2: 8, z2: 28, floor: C.sand }, // T spawn
-  { x1: -4, z1: 14, x2: 4, z2: 22, floor: C.sand }, // T -> mid
-  { x1: 4, z1: 20, x2: 16, z2: 27, floor: C.sand }, // T -> long
-  { x1: -18, z1: 21, x2: -4, z2: 27, floor: C.sand }, // T -> tunnels
-  // Long
-  { x1: 13, z1: 18, x2: 28, z2: 28, floor: C.sand }, // outside long
-  { x1: 15, z1: 11, x2: 26, z2: 21, floor: C.sand }, // long doors
-  { x1: 17, z1: -6, x2: 26, z2: 13, floor: C.sand }, // long A
-  { x1: 16, z1: -11, x2: 26, z2: -4, floor: C.sandDark }, // A ramp
-  // A site
-  { x1: 8, z1: -22, x2: 26, z2: -9, floor: C.concrete },
-  { x1: 5, z1: -27, x2: 13, z2: -20, floor: C.sand }, // CT -> A
-  // Short / catwalk
-  { x1: 2, z1: -12, x2: 10, z2: -4, floor: C.sand }, // short A
-  { x1: 0, z1: -7, x2: 5, z2: -1, floor: C.sand }, // catwalk
-  // Mid
-  { x1: -4, z1: -16, x2: 4, z2: 17, floor: C.sand },
-  { x1: -4, z1: -21, x2: 4, z2: -14, floor: C.sand }, // mid -> CT
-  { x1: -14, z1: -9, x2: -2, z2: -2, floor: C.sandDark }, // mid -> B (lower tunnel)
-  // B tunnels
-  { x1: -22, z1: -7, x2: -15, z2: 7, floor: C.sandDark }, // B doors
-  { x1: -22, z1: 5, x2: -15, z2: 24, floor: C.sandDark }, // upper tunnels
-  // B site
-  { x1: -26, z1: -21, x2: -9, z2: -4, floor: C.concrete },
-  { x1: -14, z1: -27, x2: -5, z2: -19, floor: C.sand }, // CT -> B
-  // CT spawn
-  { x1: -9, z1: -28, x2: 9, z2: -19, floor: C.concrete },
+  // ---------------- T side ----------------
+  { x1: -7, z1: 21, x2: 7, z2: 28, floor: C.sand }, // T spawn
+  { x1: -3, z1: 14, x2: 3, z2: 23, floor: C.sand }, // T ramp -> mid
+  { x1: 4, z1: 19, x2: 16, z2: 27, floor: C.sand }, // T -> long
+  { x1: -19, z1: 21, x2: -4, z2: 27, floor: C.sandDark }, // T -> upper tunnels
 
-  // ---- elevation: pit, platforms, stairs (later zones win) ----
-  { x1: 20.5, z1: -4, x2: 21.5, z2: 2, floor: C.sandDark, y: -0.4 },
-  { x1: 21.5, z1: -4, x2: 22.5, z2: 2, floor: C.sandDark, y: -0.8 },
-  { x1: 22.5, z1: -4, x2: 28, z2: 2, floor: C.sandDark, y: -1.2 },
-  { x1: 19, z1: -21, x2: 20, z2: -17, floor: C.concrete, y: 0.3 },
-  { x1: 20, z1: -21, x2: 26, z2: -17, floor: C.concrete, y: 0.6 },
-  { x1: -21, z1: -21, x2: -20, z2: -15, floor: C.concrete, y: 0.45 },
-  { x1: -26, z1: -21, x2: -21, z2: -15, floor: C.concrete, y: 0.9 },
-  { x1: -19, z1: 8, x2: -15, z2: 10, floor: C.sandDark, y: 0.35 },
-  { x1: 6, z1: -12, x2: 8, z2: -8, floor: C.sand, y: 0.35 },
+  // ---------------- long A ----------------
+  { x1: 13, z1: 14, x2: 28, z2: 26, floor: C.sand }, // outside long
+  { x1: 16, z1: 11, x2: 27, z2: 17, floor: C.sand }, // long doors
+  { x1: 18, z1: -9, x2: 27, z2: 13, floor: C.sand }, // long A
+  { x1: 15, z1: -14, x2: 27, z2: -7, floor: C.sandDark }, // A ramp
+
+  // ---------------- A site ----------------
+  { x1: 8, z1: -23, x2: 27, z2: -9, floor: C.concrete },
+  { x1: 6, z1: -28, x2: 14, z2: -21, floor: C.sand }, // CT -> A
+
+  // ---------------- short / catwalk ----------------
+  { x1: 3, z1: -14, x2: 11, z2: -6, floor: C.sand }, // short A
+  { x1: 0, z1: -8, x2: 5, z2: -2, floor: C.sand }, // catwalk
+
+  // ---------------- mid ----------------
+  { x1: -4, z1: -19, x2: 4, z2: 16, floor: C.sand },
+  { x1: -4, z1: -24, x2: 4, z2: -17, floor: C.sand }, // mid -> CT
+  { x1: -13, z1: -9, x2: -2, z2: -2, floor: C.sandDark }, // mid -> B (lower)
+
+  // ---------------- B tunnels ----------------
+  { x1: -23, z1: -7, x2: -15, z2: 2, floor: C.sandDark }, // B doors
+  { x1: -23, z1: 0, x2: -15, z2: 23, floor: C.sandDark }, // upper tunnels
+
+  // ---------------- B site ----------------
+  { x1: -27, z1: -23, x2: -12, z2: -5, floor: C.concrete },
+  { x1: -15, z1: -28, x2: -6, z2: -21, floor: C.sand }, // CT -> B
+
+  // ---------------- CT spawn ----------------
+  { x1: -8, z1: -29, x2: 8, z2: -21, floor: C.concrete },
+
+  // ---------------- elevation ----------------
+  { x1: 22, z1: -6, x2: 23, z2: 1, floor: C.sandDark, y: -0.4 }, // pit steps
+  { x1: 23, z1: -6, x2: 24, z2: 1, floor: C.sandDark, y: -0.8 },
+  { x1: 24, z1: -6, x2: 28, z2: 1, floor: C.sandDark, y: -1.2 }, // pit
+  { x1: 8, z1: -18, x2: 13, z2: -17, floor: C.concrete, y: 0.3 }, // A goose step
+  { x1: 8, z1: -23, x2: 13, z2: -18, floor: C.concrete, y: 0.6 }, // A goose
+  { x1: -21, z1: -23, x2: -20, z2: -17, floor: C.concrete, y: 0.45 }, // B plat step
+  { x1: -27, z1: -23, x2: -21, z2: -17, floor: C.concrete, y: 0.9 }, // B back plat
+  { x1: -19, z1: 10, x2: -15, z2: 12, floor: C.sandDark, y: 0.3 }, // tunnel step
+  { x1: 8, z1: -12, x2: 11, z2: -10, floor: C.sand, y: 0.35 }, // short stairs
 ];
+
+function tintBySide(hex: number, worldZ: number): number {
+  const c = new THREE.Color(hex);
+  // CT side (north) leans cool, T side (south) leans warm
+  const t = Math.max(-1, Math.min(1, worldZ / 22));
+  c.offsetHSL(t > 0 ? 0.02 : -0.015, t > 0 ? 0.03 : 0.01, t > 0 ? 0.015 : -0.01);
+  return c.getHex();
+}
 
 export function buildMap(): MapData {
   const b = new Builder();
@@ -391,77 +413,81 @@ export function buildMap(): MapData {
 
       const x1 = MAP_MIN + ix;
       const z1 = MAP_MIN + iz;
-      const col = (ix + iz) % 7 === 0 ? C.stoneLow : C.stone;
+      const worldZ = MAP_MIN + iz + h / 2;
+      const baseCol = (ix + iz) % 7 === 0 ? C.stoneLow : C.stone;
+      const col = tintBySide(baseCol, worldZ);
       b.box(x1, z1, x1 + w, z1 + h, -2.5, WALL_H - 0.35, col, true, 0.2);
       b.box(x1, z1, x1 + w, z1 + h, WALL_H - 0.35, WALL_H, C.stoneLow, false, 0.2);
     }
   }
 
-  // ---- long doors ---------------------------------------------------
-  b.doorWall(15, 14, 26, 15.2, 'x', 20.5, 5, WALL_H, 4.6);
-  // ---- mid doors ----------------------------------------------------
-  b.doorWall(-4.4, 5, 4.4, 6.2, 'x', 0, 3.2, WALL_H, 4.8);
-  // ---- B doors ------------------------------------------------------
-  b.doorWall(-22, -0.6, -15, 0.6, 'x', -18.5, 3.4, WALL_H, 4.4);
+  // ---- doorways ------------------------------------------------------
+  b.doorWall(16, 13.2, 27, 14.4, 'x', 21.5, 5, WALL_H, 4.6); // long doors
+  b.doorWall(-4.4, 2.5, 4.4, 3.7, 'x', 0, 3.2, WALL_H, 4.8); // mid doors
+  b.doorWall(-23, -1.2, -15, 0, 'x', -19, 3.4, WALL_H, 4.4); // B doors
+  b.doorWall(6, -22.4, 14, -21.2, 'x', 10, 3.6, WALL_H, 4.4); // CT -> A arch
+  b.doorWall(-15, -22.4, -6, -21.2, 'x', -10.5, 3.6, WALL_H, 4.4); // CT -> B arch
 
-  // ---- A site -------------------------------------------------------
-  b.crate(15.5, -16.5, 2.2); // default
-  b.stacked(19.5, -13.5, 2.2); // double stack
-  b.crate(23.5, -19.5, 2.0); // goose
+  // ---- tunnel ceilings -------------------------------------------------
+  b.ceiling(-23, -7, -15, 23, 4.3);
+  b.ceiling(-13, -9, -2, -2, 4.1);
 
-  b.barrel(11.5, -19.5);
-  b.barrel(11.5, -18.4);
-  b.box(8.4, -22.4, 9.6, -20.4, 0, 1.1, C.concreteDark); // site lip
+  // ---- A site ----------------------------------------------------------
+  b.crate(16, -17.5, 2.2); // default box
+  b.stacked(20, -13.5, 2.2); // double stack
+  b.crate(24, -20, 2.0); // goose crates
+  b.crate(15.5, -20.5, 1.8);
+  b.barrel(12.5, -20);
+  b.barrel(12.5, -18.9);
+  b.box(18, -22.6, 22, -21.8, 0, 1.1, C.concreteDark); // site lip
 
-  // ---- B site -------------------------------------------------------
+  // ---- B site ----------------------------------------------------------
+  b.crate(-18, -13, 2.4); // big box
+  b.crate(-13.5, -19, 2.0);
+  b.stacked(-24.5, -12, 2.0);
+  b.barrel(-13, -9.5);
+  b.barrel(-14, -8.6);
 
-  b.crate(-17, -12.5, 2.4); // big box
-  b.crate(-13.4, -18.5, 2.0);
-  b.stacked(-24, -10.5, 2.0);
-  b.barrel(-11.5, -8);
-  b.barrel(-12.5, -7.2);
-
-  // ---- long ---------------------------------------------------------
+  // ---- long ------------------------------------------------------------
   b.box(20, -1.2, 23.2, 1.4, 0, 1.35, C.metal); // the car
   b.box(20.2, -0.9, 23.0, 1.1, 1.35, 1.62, 0x3c424a, false);
-  b.box(22, 5.6, 26.2, 9.6, 0, 2.7, C.blue); // blue container
-  b.box(22, 5.6, 26.2, 9.6, 2.7, 2.82, 0x2c4762, false);
-  b.crate(18, 9.5, 2.0);
-  b.crate(24.6, -3.2, 1.9);
-  b.box(17, 2.4, 18.2, 4.6, 0, 0.95, C.sandDark); // sandbag line
+  b.box(22.5, 5.4, 26.8, 9.4, 0, 2.7, C.blue); // blue container
+  b.box(22.5, 5.4, 26.8, 9.4, 2.7, 2.82, 0x2c4762, false);
+  b.crate(19, 10, 2.0);
+  b.crate(25.2, -3.6, 1.9);
+  b.box(18, 4, 19.2, 6.2, 0, 0.95, C.sandDark); // sandbags
 
-  // ---- mid ----------------------------------------------------------
-  b.crate(2.4, -3.4, 1.9); // xbox
-  b.crate(-2.8, 12, 1.7);
-  b.box(-3.8, -12.5, -1.4, -11.4, 0, 0.9, C.concreteDark);
+  // ---- mid -------------------------------------------------------------
+  b.crate(2.4, -4, 1.9); // xbox
+  b.crate(-2.8, 11, 1.7);
+  b.box(-3.8, -15.5, -1.4, -14.4, 0, 0.9, C.concreteDark);
 
-  // ---- catwalk / short ----------------------------------------------
-  b.crate(6.5, -8.5, 1.7);
-  b.box(2.2, -4.4, 3.0, -1.6, 0, 0.95, C.sandDark);
+  // ---- short / catwalk -------------------------------------------------
+  b.crate(6.5, -9.5, 1.7);
+  b.box(2.2, -5.4, 3.0, -2.6, 0, 0.95, C.sandDark);
 
-  // ---- tunnels ------------------------------------------------------
-  b.crate(-19, 10, 1.9);
-  b.crate(-16.5, 18, 1.7);
-  b.barrel(-21, 15);
-  b.barrel(-20.6, 16.2);
-  b.crate(-19.5, 2, 1.8);
+  // ---- tunnels ---------------------------------------------------------
+  b.crate(-19, 9, 1.9);
+  b.crate(-16.5, 17, 1.7);
+  b.barrel(-21, 14);
+  b.barrel(-20.6, 15.2);
+  b.crate(-19.5, -3.5, 1.8);
 
-  // ---- CT spawn ------------------------------------------------------
-  b.crate(-6.5, -25.5, 2.0);
-  b.crate(5.5, -26, 2.0);
-  b.box(-9.4, -22.6, -7.6, -21.4, 0, 1.1, C.concreteDark);
+  // ---- CT spawn --------------------------------------------------------
+  b.crate(-6.5, -26, 2.0);
+  b.crate(5.5, -26.5, 2.0);
+  b.box(-8.4, -23.6, -6.6, -22.4, 0, 1.1, C.concreteDark);
 
-  // ---- T spawn -------------------------------------------------------
-  b.crate(-5, 23.5, 2.0);
-  b.crate(5.5, 25, 2.0);
+  // ---- T spawn ---------------------------------------------------------
+  b.crate(-5, 24, 2.0);
+  b.crate(5.5, 25.5, 2.0);
   b.box(-2.6, 27.2, 2.6, 27.9, 0, 1.0, C.concreteDark);
 
-  // ---- extra cover ----------------------------------------------------
-  b.crate(23.5, 11, 1.8);
+  // ---- extra cover -----------------------------------------------------
+  b.crate(23.5, 11.5, 1.8);
   b.crate(-23.5, 4, 1.8);
-  b.crate(9.5, 2.5, 1.6);
-  b.barrel(16.5, -18.5);
-  b.box(-8.5, -13.2, -7.2, -12.2, 0, 0.9, C.concreteDark);
+  b.crate(9.5, 1.5, 1.6);
+  b.barrel(16.5, -19.5);
 
   // ---- assemble -------------------------------------------------------
   const merged = mergeGeometries(b.geos, false)!;
@@ -489,15 +515,15 @@ export function buildMap(): MapData {
     walkable,
     heightAt,
     botSpawns: [
-      new THREE.Vector3(0, 0, -24),
-      new THREE.Vector3(7, 0, -25),
-      new THREE.Vector3(-7, 0, -25),
-      new THREE.Vector3(17, 0, -13),
-      new THREE.Vector3(-17, 0, -12),
-      new THREE.Vector3(20, 0, -23),
-      new THREE.Vector3(-20, 0, -23),
+      new THREE.Vector3(0, 0, -25),
+      new THREE.Vector3(6, 0, -26),
+      new THREE.Vector3(-6, 0, -26),
+      new THREE.Vector3(18, 0, -13),
+      new THREE.Vector3(-18, 0, -12),
+      new THREE.Vector3(22, 0, -24),
+      new THREE.Vector3(-22, 0, -24),
     ],
-    playerSpawn: new THREE.Vector3(0, 0, 24),
+    playerSpawn: new THREE.Vector3(0, 0, 25),
   };
 }
 

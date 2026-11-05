@@ -59,6 +59,7 @@ export class Net {
   private name = 'player';
   private pingTimer: number | null = null;
   private reconnectAttempts = 0;
+  private connectTimer: number | null = null;
 
   /** Normalises "host:8080", "https://x", "wss://x/ws" into a ws URL. */
   static normalise(raw: string): string {
@@ -94,7 +95,21 @@ export class Net {
     }
     this.ws = ws;
 
+    this.connectTimer = window.setTimeout(() => {
+      if (this.status === 'connecting') {
+        try {
+          ws.close();
+        } catch {
+          /* ignore */
+        }
+        this.status = 'error';
+        this.lastError = 'connection timed out — is the server running and reachable?';
+        this.onStatus?.();
+      }
+    }, 8000);
+
     ws.onopen = () => {
+      if (this.connectTimer) window.clearTimeout(this.connectTimer);
       this.reconnectAttempts = 0;
       this.status = 'online';
       this.send({ t: 'hello', name: this.name });
@@ -106,18 +121,25 @@ export class Net {
     ws.onmessage = (ev) => this.handle(JSON.parse(ev.data));
 
     ws.onclose = () => {
+      if (this.connectTimer) window.clearTimeout(this.connectTimer);
       if (this.pingTimer) window.clearInterval(this.pingTimer);
       this.pingTimer = null;
       const wasOnline = this.status === 'online';
       this.status = 'error';
-      this.lastError = wasOnline ? 'disconnected from server' : 'could not reach server';
+      this.lastError = wasOnline
+        ? 'disconnected from server'
+        : this.lastError || 'could not reach server — check the address';
       this.players.clear();
       this.room = null;
       this.onStatus?.();
     };
 
     ws.onerror = () => {
-      this.lastError = 'connection failed';
+      this.lastError = 'connection failed — check the address and that the server is up';
+      if (this.status === 'connecting') {
+        this.status = 'error';
+        this.onStatus?.();
+      }
     };
   }
 

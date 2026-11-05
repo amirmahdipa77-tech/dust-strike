@@ -13,6 +13,7 @@ import { settings, onSettingsChange, resetSettings } from './settings';
 import { Net } from './net';
 import { Lobby } from './lobby';
 import { RemotePlayers } from './remote';
+import { Minimap } from './minimap';
 
 type State = 'menu' | 'playing' | 'paused' | 'dead' | 'won' | 'settings' | 'lobby' | 'online';
 
@@ -43,6 +44,18 @@ const camera = new THREE.PerspectiveCamera(settings.fov, window.innerWidth / win
 scene.add(camera);
 
 scene.add(new THREE.HemisphereLight(0xfffaf0, 0xb3a486, 1.25));
+
+// warm fill lights for the enclosed tunnels and B site
+for (const [x, y, z, intensity, dist] of [
+  [-19, 3.4, 8, 14, 16],
+  [-19, 3.4, -3, 12, 14],
+  [-18, 3.2, -14, 12, 16],
+  [0, 3.4, 0, 9, 14],
+] as const) {
+  const lamp = new THREE.PointLight(0xffd9a0, intensity, dist, 2);
+  lamp.position.set(x, y, z);
+  scene.add(lamp);
+}
 const sun = new THREE.DirectionalLight(0xfff6e2, 1.25);
 sun.position.set(38, 62, 24);
 scene.add(sun);
@@ -100,6 +113,9 @@ const net = new Net();
 
 const hud = new HUD();
 const sfx = new SFX();
+const minimapEl = document.getElementById('minimap') as HTMLCanvasElement;
+const minimap = new Minimap(minimapEl, map);
+let minimapAccum = 0;
 
 // ---------------------------------------------------------------- particles
 const MAX_PARTICLES = 140;
@@ -273,6 +289,7 @@ function setState(s: State): void {
   show(el.lobby, s === 'lobby');
   show(el.win, s === 'won');
   show(el.sbToggle, s === 'online');
+  show(minimapEl, settings.showMinimap && (s === 'playing' || s === 'online' || s === 'dead'));
   show(el.leave, s === 'paused' && online);
   show(el.netInfo, s === 'online');
   if (s !== 'online') {
@@ -462,6 +479,7 @@ function applySettings(): void {
   input.joystickScale = settings.joystickScale;
   input.leftHanded = settings.leftHanded;
   document.body.classList.toggle('lefty', settings.leftHanded);
+  show(minimapEl, settings.showMinimap && (state === 'playing' || state === 'online' || state === 'dead'));
   if (!online && bots.bots.length !== settings.botCount) {
     bots.setCount(settings.botCount);
     botMeshes = bots.meshes;
@@ -663,6 +681,20 @@ function stepCombat(dt: number): void {
   hud.setWeaponSlot(weapon.def.slot);
   hud.setWeaponName(weapon.def.name);
   hud.setScopeAmmo(weapon.mag, weapon.reserve);
+
+  minimapAccum += dt;
+  if (minimapAccum > 0.08 && settings.showMinimap) {
+    minimapAccum = 0;
+    const blips = online
+      ? [...net.players.values()]
+          .filter((p) => p.id !== net.id && p.alive)
+          .map((p) => ({ x: p.x, z: p.z, color: p.team === 'T' ? '#e0a75a' : '#7ab0e0' }))
+      : bots.bots
+          .filter((b) => b.alive)
+          .map((b) => ({ x: b.pos.x, z: b.pos.z, color: '#ff5a45' }));
+    minimap.draw(player.pos.x, player.pos.z, player.yaw, blips);
+  }
+  show(minimapEl, settings.showMinimap && (state === 'playing' || state === 'online'));
   hud.setSpread(2 + weapon.kick * 8 + Math.min(7, player.speed * 0.85));
 }
 

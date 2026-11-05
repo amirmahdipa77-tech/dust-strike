@@ -237,6 +237,7 @@ export class SettingsUI {
       this.toggle('Hitmarker', 'Flash when a bullet lands', 'showHitmarker');
       this.toggle('Damage flash', 'Red vignette when hit', 'damageFlash');
       this.toggle('Damage direction', 'Arc showing where fire came from', 'showDamageDir');
+      this.toggle('Radar', 'Top-down minimap in the corner', 'showMinimap');
     }
 
     if (this.activeTab === 'video') {

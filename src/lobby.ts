@@ -13,6 +13,7 @@ export class Lobby {
   private net: Net;
   private onPlay: () => void;
   private onClose: () => void;
+  private refreshTimer: number | null = null;
 
   constructor(net: Net, onPlay: () => void, onClose: () => void) {
     this.net = net;
@@ -46,6 +47,14 @@ export class Lobby {
     this.renderStatus();
     if (this.net.status !== 'online') this.connect();
     else this.net.requestRooms();
+    this.startAutoRefresh();
+  }
+
+  private startAutoRefresh(): void {
+    if (this.refreshTimer) return;
+    this.refreshTimer = window.setInterval(() => {
+      if (this.net.status === 'online' && this.tab === 'browse') this.net.requestRooms();
+    }, 3000);
   }
 
   private connect(): void {
@@ -132,7 +141,10 @@ export class Lobby {
           <div class="roomState ${r.state}">${r.state}</div>
         </div>`;
       card.onclick = () => {
-        if (this.net.status !== 'online') return;
+        if (this.net.status !== 'online') {
+          this.connect();
+          return;
+        }
         this.net.joinRoom(r.id);
         this.onPlay();
       };
@@ -193,7 +205,11 @@ export class Lobby {
     btn.textContent = 'CREATE & PLAY';
     btn.style.marginTop = '16px';
     btn.onclick = () => {
-      if (this.net.status !== 'online') return;
+      if (this.net.status !== 'online') {
+        this.connect();
+        this.statusEl.textContent = 'connecting… press CREATE again in a second';
+        return;
+      }
       this.net.createRoom({
         name: nameInput.value || 'server',
         max: Number(maxInput.value),
@@ -235,7 +251,14 @@ export class Lobby {
     btn.style.marginTop = '16px';
     btn.onclick = () => {
       const code = input.value.trim().toUpperCase();
-      if (code.length < 3 || this.net.status !== 'online') return;
+      if (this.net.status !== 'online') {
+        this.connect();
+        return;
+      }
+      if (code.length < 3) {
+        this.statusEl.textContent = 'enter the 4-letter server code';
+        return;
+      }
       this.net.joinRoom(code);
       this.onPlay();
     };

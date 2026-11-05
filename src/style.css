@@ -1376,3 +1376,20 @@ input[type="range"]::-moz-range-thumb {
 #hud.scoped #weaponSlots {
   opacity: 0;
 }
+
+#minimap {
+  position: absolute;
+  top: calc(56px + env(safe-area-inset-top));
+  left: calc(14px + env(safe-area-inset-left));
+  width: 148px;
+  height: 148px;
+  border-radius: 10px;
+  border: 1px solid rgba(233, 217, 182, 0.16);
+  background: rgba(8, 6, 3, 0.55);
+  backdrop-filter: blur(4px);
+  opacity: 0.92;
+}
+.lefty #minimap {
+  left: auto;
+  right: calc(14px + env(safe-area-inset-right));
+}

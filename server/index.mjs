@@ -167,7 +167,15 @@ function listRooms() {
 const server = http.createServer((req, res) => {
   if (req.url === '/health') {
     res.writeHead(200, { 'Content-Type': 'application/json' });
-    res.end(JSON.stringify({ ok: true, rooms: rooms.size, players: countPlayers() }));
+    res.end(
+      JSON.stringify({
+        ok: true,
+        version: '1.1.0',
+        rooms: rooms.size,
+        players: countPlayers(),
+        uptime: Math.round(process.uptime()),
+      }),
+    );
     return;
   }
   if (req.url === '/rooms') {
@@ -191,6 +199,15 @@ function countPlayers() {
 // ---------------------------------------------------------------- ws
 const wss = new WebSocketServer({ server, path: '/ws' });
 
+function broadcastLobby() {
+  const payload = JSON.stringify({ t: 'rooms', rooms: listRooms() });
+  for (const client of wss.clients) {
+    const player = client.player;
+    if (!player || player.room) continue;
+    if (client.readyState === 1) client.send(payload);
+  }
+}
+
 wss.on('connection', (ws) => {
   const player = {
     id: `p${nextPlayerId++}`,
@@ -209,6 +226,12 @@ wss.on('connection', (ws) => {
     lastShot: 0,
     respawnAt: 0,
   };
+
+  ws.player = player;
+  ws.isAlive = true;
+  ws.on('pong', () => {
+    ws.isAlive = true;
+  });
 
   const send = (msg) => ws.readyState === 1 && ws.send(JSON.stringify(msg));
 
@@ -247,6 +270,7 @@ wss.on('connection', (ws) => {
           spawn: { x: player.pos.x, z: player.pos.z, yaw: player.yaw },
         });
         room.broadcast({ t: 'playerJoin', id: player.id, name: player.name, team: player.team }, player.id);
+        broadcastLobby();
         break;
       }
       case 'join': {
@@ -263,10 +287,13 @@ wss.on('connection', (ws) => {
           spawn: { x: player.pos.x, z: player.pos.z, yaw: player.yaw },
         });
         room.broadcast({ t: 'playerJoin', id: player.id, name: player.name, team: player.team }, player.id);
+        broadcastLobby();
         break;
       }
       case 'leave': {
         leaveRoom(player);
+        send({ t: 'rooms', rooms: listRooms() });
+        broadcastLobby();
         break;
       }
       case 'input': {
@@ -310,6 +337,14 @@ wss.on('connection', (ws) => {
               p.deaths = 0;
               p.hp = 100;
               p.alive = true;
+              const spawn = SPAWNS[p.team][rand(SPAWNS[p.team].length)];
+              p.pos = { x: spawn.x, y: 0, z: spawn.z };
+              p.yaw = spawn.yaw;
+              if (p.ws.readyState === 1) {
+                p.ws.send(
+                  JSON.stringify({ t: 'respawn', spawn: { x: spawn.x, z: spawn.z, yaw: spawn.yaw } }),
+                );
+              }
             }
           }
         } else {
@@ -343,6 +378,7 @@ function leaveRoom(player) {
   room.remove(player);
   room.broadcast({ t: 'playerLeave', id: player.id });
   player.room = null;
+  broadcastLobby();
 }
 
 // respawn sweep
@@ -372,6 +408,21 @@ setInterval(() => {
     }
   }
 }, 60_000);
+
+setInterval(() => {
+  for (const ws of wss.clients) {
+    if (ws.isAlive === false) {
+      ws.terminate();
+      continue;
+    }
+    ws.isAlive = false;
+    try {
+      ws.ping();
+    } catch {
+      /* ignore */
+    }
+  }
+}, 20_000);
 
 server.listen(PORT, () => {
   console.log(`DUST STRIKE server listening on :${PORT}  (ws path /ws)`);

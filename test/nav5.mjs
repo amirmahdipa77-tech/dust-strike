@@ -1,0 +1,24 @@
+import http from 'node:http'; import fs from 'node:fs'; import path from 'node:path';
+import { createRequire } from 'node:module';
+const require = createRequire(import.meta.url);
+const puppeteer = require('/usr/lib/node_modules/puppeteer-core');
+const ROOT='/scratch/work/dust/dist';
+const server=http.createServer((req,res)=>{let p=decodeURIComponent(req.url.split('?')[0]); if(p==='/')p='/index.html'; const f=path.join(ROOT,p); if(!fs.existsSync(f)){res.writeHead(404);res.end();return;} res.writeHead(200,{'Content-Type':p.endsWith('.js')?'text/javascript':p.endsWith('.css')?'text/css':'text/html'}); fs.createReadStream(f).pipe(res);});
+await new Promise(r=>server.listen(4215,r));
+const browser=await puppeteer.launch({executablePath:'/usr/local/bin/chromium',headless:true,args:['--no-sandbox','--enable-unsafe-swiftshader','--use-gl=angle','--use-angle=swiftshader']});
+const page=await browser.newPage(); await page.setViewport({width:600,height:300});
+page.on('pageerror',e=>console.log('PAGEERROR',e.message));
+await page.goto('http://localhost:4215/',{waitUntil:'domcontentloaded'});
+await new Promise(r=>setTimeout(r,2400));
+const out = await page.evaluate(()=>{
+  const n = window.__game.nav;
+  const from = [0, 25];
+  const pts = { ct:[0,-25], aSite:[16,-16], bSite:[-18,-13], long:[22,8], mid:[0,0], tunnels:[-19,14], short:[7,-9], pit:[26,-2] };
+  const paths = {};
+  for (const [k,v] of Object.entries(pts)) paths[k] = n.findPath(from[0],from[1],v[0],v[1]).length;
+  let walk=0; for (const c of n.walkable) walk+=c;
+  const h = window.__game.map.heightAt;
+  return { paths, walkable: walk, pit: h(26,-2), goose: h(10,-20), bplat: h(-24,-19) };
+});
+console.log(JSON.stringify(out));
+await browser.close(); server.close();

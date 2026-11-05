@@ -1,10 +1,28 @@
-# DUST STRIKE — v4
+# DUST STRIKE — v5
 
 A light, fast CS-style mobile FPS in **TypeScript + Three.js**, packaged for Android with **Capacitor** and built by **GitHub Actions**.
 
 - **Engine:** Three.js (WebGL), no game-engine runtime — ~600 KB of JS, zero external assets
 - **Shell:** Capacitor 7 → Android (landscape, immersive fullscreen)
 - **APK:** built automatically on every push to `main` (and attached to releases on tags)
+
+## Map (v5)
+
+Rebuilt on dust2 proportions with the classic callouts:
+
+```
+      B site ──── CT spawn ──── A site
+         │            │            │
+   B tunnels ──── mid ──── short A / catwalk
+         │            │            │
+      T spawn ──── T ramp ──── long doors ── long A (pit, car, blue)
+```
+
+- **Long A**: outside long → long doors choke → long A with the car, blue container and the **pit** (−1.2 m, stepped entry) → A ramp.
+- **A site**: default box, double stack, goose platform (+0.6 m) and the CT arch.
+- **Mid**: double doors, xbox, catwalk to short A with steps, lower tunnel to B.
+- **B**: upper tunnels with a **ceiling and warm lights**, B doors, back platform (+0.9 m), big box.
+- **Radar**: live minimap in the corner drawn straight from the map grid — walls, elevation tints, teammates and enemies.
 
 ## Weapons (v4)
 
@@ -44,6 +62,16 @@ npm start          # ws://localhost:8080/ws   (health: /health, rooms: /rooms)
 
 Then in the game: **MULTIPLAYER → server address `ws://localhost:8080/ws` → CONNECT**.
 On a phone use your computer's LAN IP, e.g. `ws://192.168.1.20:8080/ws` — same Wi-Fi, no deploy needed.
+
+### Troubleshooting (read this first)
+
+| Symptom | Cause | Fix |
+| --- | --- | --- |
+| "connection failed" on the phone | `ws://localhost` points at the phone itself | use `ws://<your-pc-LAN-IP>:8080/ws` on the same Wi-Fi, or a deployed `wss://` URL |
+| "connection timed out" | server not running / firewall | check `http://<host>:8080/health` in a browser |
+| Works on PC, not on phone | mixed content (https page → ws socket) | fixed in v5: the app now loads over `http://localhost` with cleartext allowed |
+| "server is full" | room hit its max players | raise max players when creating, or join another room |
+| Random disconnects | dead socket | v5 adds a 20 s heartbeat and auto cleanup |
 
 ### Deploy it (so friends anywhere can join)
 

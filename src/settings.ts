@@ -26,6 +26,7 @@ export interface Settings {
   showDamageDir: boolean;
   showHitmarker: boolean;
   damageFlash: boolean;
+  showMinimap: boolean;
 
   // video / audio
   resolution: number; // 0.55 .. 1.0 (multiplier on device pixel ratio)
@@ -59,6 +60,7 @@ export const DEFAULTS: Settings = {
   showDamageDir: true,
   showHitmarker: true,
   damageFlash: true,
+  showMinimap: true,
 
   resolution: 1,
   masterVolume: 0.6,
@@ -95,6 +97,7 @@ function clampAll(s: Settings): Settings {
     showDamageDir: !!s.showDamageDir,
     showHitmarker: !!s.showHitmarker,
     damageFlash: !!s.damageFlash,
+    showMinimap: s.showMinimap !== false,
     resolution: n(s.resolution, 0.55, 1, 1),
     masterVolume: n(s.masterVolume, 0, 1, 0.6),
     botCount: Math.round(n(s.botCount, 2, 6, 4)),
