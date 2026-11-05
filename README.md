@@ -1,39 +1,42 @@
-# DUST STRIKE — v1
+# DUST STRIKE — v2
 
-A tiny, fast, CS-style mobile FPS built with **TypeScript + Three.js** and shipped as an Android APK through **Capacitor** and **GitHub Actions**.
+A light, fast CS-style mobile FPS in **TypeScript + Three.js**, packaged for Android with **Capacitor** and built by **GitHub Actions**.
 
-- **Engine:** Three.js (WebGL) — no game engine runtime, ~575 KB of JS, no external assets
-- **Language:** TypeScript (strict), Vite build
+- **Engine:** Three.js (WebGL), no game-engine runtime — ~600 KB of JS, zero external assets
 - **Shell:** Capacitor 7 → Android (landscape, immersive fullscreen)
-- **APK:** built automatically by `.github/workflows/android.yml`
+- **APK:** built automatically on every push to `main` (and attached to releases on tags)
 
-## What is in v1
+## What's new in v2
 
-- Dust-inspired map: **Mid** with doors, **Long A** with the car and blue container, **B tunnels**, two bomb sites, catwalk/short connector, T and CT spawn bands.
-- Bot deathmatch: 4 bots with A* navigation, line-of-sight checks, strafing and hitscan fire. First to **15 kills** wins.
-- Hitscan AK with recoil, spread, 30-round mag, reload, headshots (120 dmg) vs body (34 dmg).
-- Mobile controls: floating joystick (left), look-drag (right), fire / jump / reload / crouch buttons.
-- Desktop controls: WASD, mouse look (pointer lock), click to shoot, Space, R, C.
-- Performance work: one merged draw call for the whole map, vertex colours, no shadows, procedural sand texture, capped pixel ratio, adaptive resolution drop when FPS sags, 120-particle pool for impacts.
+- **Map rebuilt from scratch.** A 1 m occupancy grid paints the dust2 floor plan (T spawn, mid with doors, long A with doors/car/blue container, short A catwalk, upper + lower tunnels, A site, B site with back plat, CT spawn). Walls are greedy-meshed from that grid, so geometry follows the layout exactly; the floor carries a baked ambient-occlusion tint.
+- **Weapon animation.** Recoil pattern, muzzle flash, shell ejection, reload choreography (mag drops, new mag seats, bolt pull), idle breathing, walk bob, look sway with inertia, landing dip, camera shake.
+- **Bot animation.** Swinging legs, aim smoothing, muzzle flash, death fall.
+- **Full settings menu.** Sensitivity, joystick size, FOV, invert Y, left-handed layout, bot count, kills to win, crosshair style/colour/size/gap/opacity/dot, HUD scale + accent colour, hitmarker / damage flash / damage direction toggles, render scale, master volume. Everything persists in `localStorage`.
+- **HUD.** Glass panels, kill progress bar, directional damage arcs, animated crosshair spread.
+
+## Controls
+
+Touch: floating stick on the left, look-drag on the right, fire / jump / reload / crouch buttons (mirrored when left-handed).
+Desktop: WASD, mouse look (pointer lock), click to fire, Space, R, C.
 
 ## Run it
 
 ```bash
 npm install
 npm run dev          # http://localhost:5173
-npm run build        # type-check + production bundle into dist/
+npm run build        # type-check + production bundle
 npx cap sync android # copy dist/ into the Android project
 ```
 
 ## Build the APK
 
-Push to `main` (or run the workflow manually). The APK lands in the run's **Artifacts**:
+Push to `main`, or run **Actions → Build Android APK** manually. The APK lands in the run's artifacts:
 
 ```
-Actions → Build Android APK → dust-strike-debug-apk
+dust-strike-debug-apk → app-debug.apk
 ```
 
-Locally (needs JDK 21 + Android SDK 35):
+Locally (JDK 21 + Android SDK 35):
 
 ```bash
 npm run build && npx cap sync android
@@ -41,30 +44,37 @@ cd android && ./gradlew assembleDebug
 # android/app/build/outputs/apk/debug/app-debug.apk
 ```
 
+## Layout of the map
+
+```
+            B site        CT spawn        A site
+              |              |              |
+   upper tunnels -- B doors --+-- short A --+
+              |              |              |
+          T spawn ------- mid ---- long A
+```
+
+Mid is a long lane split by double doors; long A has its own door wall, the car and the blue container; the lower tunnel links mid to B; short A (catwalk) links mid to A.
+
 ## Project layout
 
 ```
 src/
-  main.ts        renderer, game loop, combat, state machine
-  map.ts         dust-style map builder (boxes -> one merged mesh + colliders)
+  main.ts        renderer, loop, combat, state machine
+  map.ts         grid-painted dust layout, greedy-meshed walls, props
+  nav.ts         A* grid used by the bots (built from the map grid)
   collision.ts   AABB capsule resolution, ground height, ray casts, LOS
-  nav.ts         coarse A* grid used by the bots
-  bots.ts        bot meshes, AI, shooting
-  player.ts      movement, camera, health
-  weapon.ts      viewmodel, recoil, ammo, reload
+  bots.ts        bot models, AI, animation
+  player.ts      movement, camera, health, landing/roll
+  weapon.ts      viewmodel, recoil, reload animation, shells
   input.ts       touch + keyboard/mouse
-  hud.ts         DOM HUD
-  audio.ts       synthesised SFX (no audio files)
-  style.css      HUD / overlays
+  hud.ts         DOM HUD, crosshair, damage arcs
+  ui.ts          settings panel
+  settings.ts    persisted settings
+  audio.ts       synthesised SFX
 android/         Capacitor Android project (landscape, immersive)
-.github/         CI: builds and uploads the debug APK
+.github/         CI that builds and uploads the APK
 ```
-
-## نقشه (فارسی)
-
-نقشه از سه مسیر ساخته شده: **Mid** با درهای وسط، **Long A** با ماشین و کانتینر آبی، و **B Tunnels**؛ بههمراه دو سایت بمب، مسیر کوتاه (Short A) که Mid را به Long وصل میکند، و دو ناحیهی اسپاون T و CT.
-
-بازی در نسخهی اول حالت مرگمسابقه با ۴ بات است: هر کس اول به ۱۵ کیل برسد برنده است. کنترلها هم لمسی است (جویاستیک شناور سمت چپ، کشیدن برای نگاه در سمت راست، دکمههای شلیک/پرش/خشاب/نشستن) و هم با کیبورد و ماوس.
 
 ## Licence
 

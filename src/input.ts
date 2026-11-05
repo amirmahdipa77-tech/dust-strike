@@ -10,6 +10,8 @@ export class Input {
   reloadPressed = false;
   crouching = false;
   sprinting = false;
+  joystickScale = 1;
+  leftHanded = false;
 
   private keys = new Set<string>();
   private stickId = -1;
@@ -20,6 +22,7 @@ export class Input {
   private knobEl = document.getElementById('knob') as HTMLElement;
   private enabled = false;
   private maxStick = 52;
+
 
   constructor(
     private canvas: HTMLCanvasElement,
@@ -69,10 +72,12 @@ export class Input {
       (e) => {
         if (!this.enabled) return;
         if (e.pointerType === 'mouse' && !('ontouchstart' in window)) return;
-        const leftHalf = e.clientX < window.innerWidth * 0.45;
+        const onLeft = e.clientX < window.innerWidth * 0.45;
+        const leftHalf = this.leftHanded ? !onLeft : onLeft;
         if (leftHalf && this.stickId === -1) {
           this.stickId = e.pointerId;
           this.stickOrigin = { x: e.clientX, y: e.clientY };
+          this.maxStick = 52 * this.joystickScale;
           this.stickEl.style.display = 'block';
           this.stickEl.style.left = `${e.clientX}px`;
           this.stickEl.style.top = `${e.clientY}px`;

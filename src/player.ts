@@ -14,10 +14,13 @@ export class Player {
   vel = new THREE.Vector3();
   yaw = 0;
   pitch = 0;
+  roll = 0;
   health = 100;
   alive = true;
   onGround = true;
   crouching = false;
+  landed = false;
+  deathTilt = 0;
   radius = 0.42;
   height = 1.8;
 
@@ -26,6 +29,7 @@ export class Player {
   private eyeCurrent = 1.62;
   private bobTime = 0;
   private bobOffset = 0;
+  private fallSpeed = 0;
 
   respawn(at: THREE.Vector3): void {
     this.pos.copy(at);
@@ -34,17 +38,24 @@ export class Player {
     this.alive = true;
     this.pitch = 0;
     this.yaw = 0;
+    this.roll = 0;
+    this.deathTilt = 0;
     this.eyeCurrent = this.eyeStand;
     this.bobOffset = 0;
+    this.landed = false;
   }
 
   get eyeY(): number {
     return this.pos.y + this.eyeCurrent + this.bobOffset;
   }
 
-  applyLook(dx: number, dy: number, sensitivity: number): void {
+  get speed(): number {
+    return Math.hypot(this.vel.x, this.vel.z);
+  }
+
+  applyLook(dx: number, dy: number, sensitivity: number, invertY = false): void {
     this.yaw -= dx * sensitivity;
-    this.pitch -= dy * sensitivity;
+    this.pitch -= (invertY ? -dy : dy) * sensitivity;
     const lim = Math.PI / 2 - 0.02;
     this.pitch = Math.max(-lim, Math.min(lim, this.pitch));
     if (this.yaw > Math.PI) this.yaw -= Math.PI * 2;
@@ -53,10 +64,10 @@ export class Player {
 
   update(dt: number, input: Input, colliders: Collider[]): void {
     this.crouching = input.crouching;
+    this.landed = false;
 
     const sinY = Math.sin(this.yaw);
     const cosY = Math.cos(this.yaw);
-    // forward = (-sin, -cos), right = (cos, -sin)
     let wishX = -sinY * input.moveY + cosY * input.moveX;
     let wishZ = -cosY * input.moveY - sinY * input.moveX;
 
@@ -79,19 +90,22 @@ export class Player {
     }
 
     this.vel.y -= GRAVITY * dt;
+    this.fallSpeed = Math.min(this.fallSpeed, this.vel.y);
 
     this.pos.x += this.vel.x * dt;
     this.pos.y += this.vel.y * dt;
     this.pos.z += this.vel.z * dt;
 
-    // horizontal collision, twice for stable corner resolution
     resolveCollision(this.pos, this.radius, this.height, colliders);
     resolveCollision(this.pos, this.radius, this.height, colliders);
 
     const ground = groundHeightAt(this.pos.x, this.pos.z, this.pos.y, colliders);
+    const wasAir = !this.onGround;
     if (this.pos.y <= ground + 0.001 && this.vel.y <= 0) {
       this.pos.y = ground;
+      if (wasAir && this.fallSpeed < -4.5) this.landed = true;
       this.vel.y = 0;
+      this.fallSpeed = 0;
       this.onGround = true;
     } else {
       this.onGround = false;
@@ -102,17 +116,25 @@ export class Player {
       this.onGround = true;
     }
 
-    // eye height + weapon bob
     const targetEye = this.crouching ? this.eyeCrouch : this.eyeStand;
     this.eyeCurrent += (targetEye - this.eyeCurrent) * Math.min(1, dt * 12);
 
-    const horizSpeed = Math.hypot(this.vel.x, this.vel.z);
+    const horizSpeed = this.speed;
     if (this.onGround && horizSpeed > 0.4) {
       this.bobTime += dt * horizSpeed * 1.9;
-      this.bobOffset = Math.sin(this.bobTime) * 0.028;
+      this.bobOffset = Math.sin(this.bobTime) * 0.026;
     } else {
       this.bobOffset += (0 - this.bobOffset) * Math.min(1, dt * 8);
     }
+
+    // strafing roll for a bit of camera life
+    const rightX = Math.cos(this.yaw);
+    const rightZ = -Math.sin(this.yaw);
+    const lateral = this.vel.x * rightX + this.vel.z * rightZ;
+    const targetRoll = THREE.MathUtils.clamp(-lateral * 0.006, -0.028, 0.028);
+    this.roll += (targetRoll - this.roll) * Math.min(1, dt * 8);
+
+    if (!this.alive) this.deathTilt = Math.min(1, this.deathTilt + dt * 1.6);
   }
 
   takeDamage(amount: number): boolean {
@@ -126,8 +148,17 @@ export class Player {
     return false;
   }
 
-  syncCamera(camera: THREE.PerspectiveCamera, recoilPitch: number): void {
-    camera.position.set(this.pos.x, this.eyeY, this.pos.z);
-    camera.rotation.set(this.pitch + recoilPitch, this.yaw, 0, 'YXZ');
+  syncCamera(camera: THREE.PerspectiveCamera, recoilPitch: number, shake = 0): void {
+    const shakeX = shake > 0 ? (Math.random() - 0.5) * shake * 0.012 : 0;
+    const shakeY = shake > 0 ? (Math.random() - 0.5) * shake * 0.012 : 0;
+    const deadRoll = this.deathTilt * 1.2;
+
+    camera.position.set(this.pos.x, this.eyeY - this.deathTilt * 1.1, this.pos.z);
+    camera.rotation.set(
+      this.pitch + recoilPitch + shakeY,
+      this.yaw + shakeX,
+      this.roll + deadRoll,
+      'YXZ',
+    );
   }
 }

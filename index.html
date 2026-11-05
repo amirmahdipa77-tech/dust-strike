@@ -6,91 +6,120 @@
       name="viewport"
       content="width=device-width, initial-scale=1, maximum-scale=1, minimum-scale=1, user-scalable=no, viewport-fit=cover"
     />
-    <meta name="theme-color" content="#151109" />
+    <meta name="theme-color" content="#0d0b07" />
     <meta name="mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
     <title>DUST STRIKE</title>
   </head>
   <body>
     <canvas id="game"></canvas>
+    <div id="vignette"></div>
+    <div id="damage"></div>
+    <div id="dmg-arrows"></div>
 
-    <!-- ============ HUD ============ -->
+    <!-- ================= HUD ================= -->
     <div id="hud" class="hidden">
-      <div id="crosshair">
-        <i class="ch ch-t"></i><i class="ch ch-b"></i><i class="ch ch-l"></i><i class="ch ch-r"></i>
-        <i id="ch-dot"></i>
+      <div id="topbar">
+        <div class="pill" id="scorePill">
+          <div class="scoreRow">
+            <span id="kills">0</span><span class="sep">/</span><span id="target">15</span>
+          </div>
+          <div class="kbar"><i id="kbar"></i></div>
+          <div class="klabel">ELIMINATIONS</div>
+        </div>
       </div>
 
+      <div id="crosshair" data-style="cross">
+        <i class="bar t"></i><i class="bar b"></i><i class="bar l"></i><i class="bar r"></i>
+        <i class="dot"></i>
+        <i class="ring"></i>
+      </div>
+      <div id="hitmarker"></div>
+
       <div id="vitals">
-        <div class="vrow"><span class="vlabel">HP</span><span id="hp">100</span></div>
+        <div class="vrow"><span class="vico">✚</span><span id="hp">100</span></div>
         <div class="bar"><i id="hpbar"></i></div>
       </div>
 
-      <div id="ammo">
-        <span id="mag">30</span><small id="reserve">/ 90</small>
-        <div id="reloading" class="hidden">RELOADING</div>
+      <div id="ammoBox">
+        <div class="ammoRow"><span id="mag">30</span><span id="reserve">90</span></div>
+        <div class="magbar"><i id="magbar"></i></div>
+        <div class="wlabel">AK-47 <span id="reloading" class="hidden">· RELOADING</span></div>
       </div>
 
-      <div id="score">
-        <span class="sk">KILLS</span> <b id="kills">0</b> <span class="sep">/</span> <span id="target">15</span>
-      </div>
-
-      <div id="fps">60 FPS</div>
+      <div id="stats"><span id="fps">60 FPS</span></div>
       <div id="feed"></div>
-      <div id="hitmarker"></div>
-      <button id="btn-pause" class="tbtn tiny">II</button>
+      <button id="btn-pause" aria-label="pause">
+        <i></i><i></i>
+      </button>
     </div>
 
-    <!-- ============ TOUCH ============ -->
+    <!-- ================= TOUCH ================= -->
     <div id="touch" class="hidden">
       <div id="stick"><div id="knob"></div></div>
-      <button id="btn-fire" class="tbtn fire">FIRE</button>
+      <button id="btn-fire" class="tbtn fire"><span>FIRE</span></button>
       <button id="btn-jump" class="tbtn small">JUMP</button>
-      <button id="btn-reload" class="tbtn small">RELOAD</button>
-      <button id="btn-crouch" class="tbtn small">CROUCH</button>
+      <button id="btn-reload" class="tbtn small">R</button>
+      <button id="btn-crouch" class="tbtn small">C</button>
     </div>
 
-    <div id="vignette"></div>
-    <div id="damage"></div>
-
-    <!-- ============ SCREENS ============ -->
+    <!-- ================= SCREENS ================= -->
     <div id="start" class="overlay">
       <div class="panel">
-        <div class="tag">v1 · mobile · landscape</div>
+        <div class="tag">v2 · dust · mobile</div>
         <h1>DUST<span>STRIKE</span></h1>
-        <p class="sub">5v5 gone solo — clear the site, hold the mid.</p>
-        <button id="btn-play" class="big">TAP TO DEPLOY</button>
+        <p class="sub">Deploy into dust2 — clear the sites, hold mid.</p>
+        <button id="btn-play" class="big">DEPLOY</button>
+        <button id="btn-settings-start" class="ghost">SETTINGS</button>
         <div class="hints">
           <div><b>MOVE</b> left thumb</div>
           <div><b>LOOK</b> right thumb</div>
-          <div><b>FIRE</b> hold button</div>
-          <div><b>GOAL</b> 15 kills</div>
+          <div><b>FIRE</b> hold</div>
+          <div><b>GOAL</b> <span id="goalHint">15</span> kills</div>
         </div>
-        <div class="foot">desktop: WASD · mouse · click to shoot</div>
+        <div class="foot">desktop · WASD · mouse · click to shoot</div>
+      </div>
+    </div>
+
+    <div id="pause" class="overlay hidden">
+      <div class="panel small">
+        <div class="tag">paused</div>
+        <h2>MATCH PAUSED</h2>
+        <button id="btn-resume" class="big">RESUME</button>
+        <button id="btn-settings-pause" class="ghost">SETTINGS</button>
+        <button id="btn-restart" class="ghost">RESTART MATCH</button>
+      </div>
+    </div>
+
+    <div id="settings" class="overlay hidden">
+      <div class="panel settings">
+        <div class="settingsHead">
+          <h2>SETTINGS</h2>
+          <button id="btn-settings-close" class="close">✕</button>
+        </div>
+        <div class="tabs" id="settingsTabs"></div>
+        <div class="tabBody" id="settingsBody"></div>
+        <div class="settingsFoot">
+          <button id="btn-settings-reset" class="ghost">RESET DEFAULTS</button>
+        </div>
       </div>
     </div>
 
     <div id="dead" class="overlay hidden">
       <div class="panel small">
-        <h2>ELIMINATED</h2>
-        <p class="sub">respawning…</p>
+        <div class="tag danger">you were eliminated</div>
+        <h2>RESPAWNING</h2>
         <div class="timer" id="deadtimer">3</div>
-      </div>
-    </div>
-
-    <div id="paused" class="overlay hidden">
-      <div class="panel small">
-        <h2>PAUSED</h2>
-        <button id="btn-resume" class="big">RESUME</button>
-        <button id="btn-restart" class="ghost">RESTART MATCH</button>
       </div>
     </div>
 
     <div id="win" class="overlay hidden">
       <div class="panel small">
-        <h2 class="win">MISSION COMPLETE</h2>
+        <div class="tag good">match complete</div>
+        <h2 class="win">VICTORY</h2>
         <p class="sub" id="winstats">15 kills</p>
         <button id="btn-again" class="big">PLAY AGAIN</button>
+        <button id="btn-settings-win" class="ghost">SETTINGS</button>
       </div>
     </div>
 

@@ -5,6 +5,12 @@ export class SFX {
   private master: GainNode | null = null;
   private noise: AudioBuffer | null = null;
   enabled = true;
+  private volume = 0.6;
+
+  setVolume(v: number): void {
+    this.volume = Math.max(0, Math.min(1, v));
+    if (this.master) this.master.gain.value = this.volume;
+  }
 
   init(): void {
     if (this.ctx) {
@@ -15,7 +21,7 @@ export class SFX {
     if (!AC) return;
     this.ctx = new AC();
     this.master = this.ctx.createGain();
-    this.master.gain.value = 0.5;
+    this.master.gain.value = this.volume;
     this.master.connect(this.ctx.destination);
 
     const len = Math.floor(this.ctx.sampleRate * 0.5);

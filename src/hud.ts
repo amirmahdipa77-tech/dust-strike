@@ -1,21 +1,49 @@
-/** DOM HUD: written only when a value actually changes. */
+import { settings } from './settings';
+
+/** DOM HUD: modern glass panels, customisable crosshair, directional damage. */
 
 export class HUD {
   private hp = document.getElementById('hp') as HTMLElement;
   private hpBar = document.getElementById('hpbar') as HTMLElement;
   private mag = document.getElementById('mag') as HTMLElement;
   private reserve = document.getElementById('reserve') as HTMLElement;
+  private magBar = document.getElementById('magbar') as HTMLElement;
   private kills = document.getElementById('kills') as HTMLElement;
+  private target = document.getElementById('target') as HTMLElement;
+  private kbar = document.getElementById('kbar') as HTMLElement;
   private fps = document.getElementById('fps') as HTMLElement;
+  private stats = document.getElementById('stats') as HTMLElement;
   private feedEl = document.getElementById('feed') as HTMLElement;
   private hitEl = document.getElementById('hitmarker') as HTMLElement;
   private dmgEl = document.getElementById('damage') as HTMLElement;
+  private arrows = document.getElementById('dmg-arrows') as HTMLElement;
   private reloadEl = document.getElementById('reloading') as HTMLElement;
   private crosshair = document.getElementById('crosshair') as HTMLElement;
+  private root = document.getElementById('hud') as HTMLElement;
 
   private last = { hp: -1, mag: -1, reserve: -1, kills: -1, fps: -1, reloading: false };
   private hitTimer = 0;
   private dmgTimer = 0;
+
+  constructor() {
+    this.crosshair.classList.add('xhair');
+    this.applySettings();
+  }
+
+  applySettings(): void {
+    const s = settings;
+    this.root.style.setProperty('--hud-scale', String(s.hudScale));
+    this.root.style.setProperty('--hud-color', s.hudColor);
+    this.root.style.setProperty('--amber', s.hudColor);
+    this.crosshair.dataset.style = s.crosshair;
+    this.crosshair.style.setProperty('--ch-color', s.crosshairColor);
+    this.crosshair.style.setProperty('--ch-size', `${s.crosshairSize}px`);
+    this.crosshair.style.setProperty('--ch-gap', `${s.crosshairGap}px`);
+    this.crosshair.style.setProperty('--ch-alpha', String(s.crosshairAlpha));
+    this.crosshair.querySelector<HTMLElement>('.dot')!.style.display = s.crosshairDot ? 'block' : 'none';
+    this.stats.style.display = s.showFps ? 'block' : 'none';
+    this.target.textContent = String(s.targetKills);
+  }
 
   setHealth(v: number): void {
     const n = Math.max(0, Math.round(v));
@@ -36,10 +64,11 @@ export class HUD {
       this.last.mag = mag;
       this.mag.textContent = String(mag);
       this.mag.style.color = mag === 0 ? '#ff5a45' : mag <= 6 ? '#ffb545' : '#fff';
+      this.magBar.style.width = `${(mag / 30) * 100}%`;
     }
     if (reserve !== this.last.reserve) {
       this.last.reserve = reserve;
-      this.reserve.textContent = `/ ${reserve}`;
+      this.reserve.textContent = String(reserve);
     }
     if (reloading !== this.last.reloading) {
       this.last.reloading = reloading;
@@ -47,10 +76,12 @@ export class HUD {
     }
   }
 
-  setKills(n: number): void {
-    if (n === this.last.kills) return;
-    this.last.kills = n;
-    this.kills.textContent = String(n);
+  setKills(n: number, target: number): void {
+    if (n !== this.last.kills) {
+      this.last.kills = n;
+      this.kills.textContent = String(n);
+      this.kbar.style.width = `${Math.min(100, (n / target) * 100)}%`;
+    }
   }
 
   setFps(n: number): void {
@@ -61,30 +92,32 @@ export class HUD {
   }
 
   setSpread(px: number): void {
-    this.crosshair.style.setProperty('--s', `${px}px`);
-    const t = this.crosshair.querySelectorAll<HTMLElement>('.ch');
-    if (t.length === 4) {
-      t[0].style.transform = `translateY(${-px}px)`;
-      t[1].style.transform = `translateY(${px}px)`;
-      t[2].style.transform = `translateX(${-px}px)`;
-      t[3].style.transform = `translateX(${px}px)`;
-    }
+    this.crosshair.style.setProperty('--ch-spread', `${Math.max(0, px).toFixed(1)}px`);
   }
 
   hit(kill: boolean): void {
+    if (!settings.showHitmarker) return;
     this.hitEl.classList.add('on');
     this.hitEl.classList.toggle('kill', kill);
-    this.hitTimer = kill ? 0.28 : 0.13;
+    this.hitTimer = kill ? 0.3 : 0.13;
   }
 
-  damage(): void {
-    this.dmgEl.style.opacity = '0.75';
-    this.dmgTimer = 0.35;
+  damage(angleRad: number | null): void {
+    if (settings.damageFlash) {
+      this.dmgEl.style.opacity = '0.55';
+      this.dmgTimer = 0.35;
+    }
+    if (settings.showDamageDir && angleRad !== null) {
+      const el = document.createElement('i');
+      el.style.setProperty('--rot', `${(angleRad * 180) / Math.PI}deg`);
+      this.arrows.appendChild(el);
+      setTimeout(() => el.remove(), 950);
+    }
   }
 
-  feed(text: string): void {
+  feed(html: string): void {
     const d = document.createElement('div');
-    d.innerHTML = text;
+    d.innerHTML = html;
     this.feedEl.prepend(d);
     while (this.feedEl.children.length > 4) this.feedEl.lastElementChild?.remove();
     setTimeout(() => d.remove(), 4200);
@@ -101,8 +134,11 @@ export class HUD {
     }
   }
 
-  reset(): void {
+  reset(target: number): void {
     this.last = { hp: -1, mag: -1, reserve: -1, kills: -1, fps: -1, reloading: false };
     this.feedEl.innerHTML = '';
+    this.arrows.innerHTML = '';
+    this.target.textContent = String(target);
+    this.kbar.style.width = '0%';
   }
 }

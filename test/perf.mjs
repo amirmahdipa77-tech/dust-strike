@@ -1,0 +1,21 @@
+import http from 'node:http'; import fs from 'node:fs'; import path from 'node:path';
+import { createRequire } from 'node:module';
+const require = createRequire(import.meta.url);
+const puppeteer = require('/usr/lib/node_modules/puppeteer-core');
+const ROOT='/scratch/work/dust/dist';
+const server=http.createServer((req,res)=>{let p=decodeURIComponent(req.url.split('?')[0]); if(p==='/')p='/index.html'; const f=path.join(ROOT,p); if(!fs.existsSync(f)){res.writeHead(404);res.end();return;} res.writeHead(200,{'Content-Type':p.endsWith('.js')?'text/javascript':p.endsWith('.css')?'text/css':'text/html'}); fs.createReadStream(f).pipe(res);});
+await new Promise(r=>server.listen(4193,r));
+const browser=await puppeteer.launch({executablePath:'/usr/local/bin/chromium',headless:true,args:['--no-sandbox','--enable-unsafe-swiftshader','--use-gl=angle','--use-angle=swiftshader']});
+const page=await browser.newPage();
+await page.setViewport({width:900,height:430});
+await page.goto('http://localhost:4193/',{waitUntil:'domcontentloaded'});
+await new Promise(r=>setTimeout(r,2400));
+await page.click('#btn-play');
+await new Promise(r=>setTimeout(r,1500));
+console.log('PERF', JSON.stringify(await page.evaluate(()=>window.__renderInfo())));
+const geo = await page.evaluate(()=>{
+  const m = window.__game.map.mesh;
+  return { verts: m.geometry.attributes.position.count, tris: m.geometry.index ? m.geometry.index.count/3 : m.geometry.attributes.position.count/3 };
+});
+console.log('MAP', JSON.stringify(geo));
+await browser.close(); server.close();

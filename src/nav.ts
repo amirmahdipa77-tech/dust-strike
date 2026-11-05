@@ -1,5 +1,16 @@
 import type { Collider } from './collision';
 
+export interface NavOptions {
+  colliders?: Collider[];
+  /** Pre-built walkability grid (1 = walkable), e.g. straight from the map. */
+  grid?: Uint8Array;
+  min?: number;
+  max?: number;
+  size?: number;
+  cell?: number;
+  radius?: number;
+}
+
 /**
  * Coarse A* navigation grid. The map is a box soup, so a 1.5 m grid over the
  * playable square is tiny (about 1k cells) and costs almost nothing per frame.
@@ -10,17 +21,25 @@ export class NavGrid {
   readonly min: number;
   readonly walkable: Uint8Array;
 
-  constructor(colliders: Collider[], min = -24.5, max = 24.5, cell = 1.25, radius = 0.5) {
-    this.cell = cell;
-    this.min = min;
-    this.size = Math.ceil((max - min) / cell);
+  constructor(opts: NavOptions) {
+    this.cell = opts.cell ?? 1;
+    this.min = opts.min ?? -24.5;
+    this.size = opts.size ?? Math.ceil(((opts.max ?? 24.5) - this.min) / this.cell);
+
+    if (opts.grid) {
+      this.walkable = new Uint8Array(opts.grid);
+      return;
+    }
+
     this.walkable = new Uint8Array(this.size * this.size).fill(1);
+    const colliders = opts.colliders ?? [];
+    const radius = opts.radius ?? 0.5;
 
     // A cell is walkable when its centre is clear of every solid box.
     for (let iz = 0; iz < this.size; iz++) {
-      const z = min + (iz + 0.5) * cell;
+      const z = this.min + (iz + 0.5) * this.cell;
       for (let ix = 0; ix < this.size; ix++) {
-        const x = min + (ix + 0.5) * cell;
+        const x = this.min + (ix + 0.5) * this.cell;
         for (const c of colliders) {
           if (c.maxY - c.minY < 0.5) continue; // kerbs are walkable
           if (c.minY > 1.5) continue; // overhead

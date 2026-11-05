@@ -4,20 +4,39 @@ import type { Player } from './player';
 import type { NavGrid } from './nav';
 
 const BOT_HP = 100;
+const DEATH_TIME = 2.6;
 
-const torsoGeo = new THREE.BoxGeometry(0.62, 0.78, 0.4);
-const legsGeo = new THREE.BoxGeometry(0.46, 0.74, 0.34);
-const headGeo = new THREE.BoxGeometry(0.27, 0.29, 0.27);
+const geo = {
+  torso: new THREE.BoxGeometry(0.6, 0.76, 0.38),
+  hips: new THREE.BoxGeometry(0.5, 0.3, 0.34),
+  leg: new THREE.BoxGeometry(0.21, 0.78, 0.24),
+  head: new THREE.BoxGeometry(0.26, 0.27, 0.26),
+  helmet: new THREE.BoxGeometry(0.29, 0.13, 0.29),
+  arm: new THREE.BoxGeometry(0.17, 0.52, 0.19),
+  gun: new THREE.BoxGeometry(0.09, 0.12, 0.62),
+};
 
-const torsoMat = new THREE.MeshLambertMaterial({ color: 0x4a4b38 });
-const legsMat = new THREE.MeshLambertMaterial({ color: 0x33342a });
-const headMat = new THREE.MeshLambertMaterial({ color: 0x8d6b47 });
+const mat = {
+  torso: new THREE.MeshLambertMaterial({ color: 0x4d4e39 }),
+  hips: new THREE.MeshLambertMaterial({ color: 0x35362b }),
+  leg: new THREE.MeshLambertMaterial({ color: 0x2f3026 }),
+  head: new THREE.MeshLambertMaterial({ color: 0x9c7b52 }),
+  helmet: new THREE.MeshLambertMaterial({ color: 0x3a3f33 }),
+  arm: new THREE.MeshLambertMaterial({ color: 0x43442f }),
+  gun: new THREE.MeshLambertMaterial({ color: 0x22252a }),
+};
 
 export class Bot {
   group = new THREE.Group();
+  root = new THREE.Group();
   torso: THREE.Mesh;
-  legs: THREE.Mesh;
   head: THREE.Mesh;
+  legL: THREE.Mesh;
+  legR: THREE.Mesh;
+  armL: THREE.Mesh;
+  armR: THREE.Mesh;
+  gun: THREE.Mesh;
+  flash: THREE.Mesh;
   hitMeshes: THREE.Mesh[] = [];
 
   pos = new THREE.Vector3();
@@ -26,6 +45,8 @@ export class Bot {
   alive = true;
   respawnTimer = 0;
 
+  private yaw = 0;
+  private targetYaw = 0;
   private fireCd = 0;
   private strafeDir = 1;
   private strafeTimer = 0;
@@ -33,6 +54,9 @@ export class Bot {
   private lastPos = new THREE.Vector3();
   private path: { x: number; z: number }[] = [];
   private pathTimer = 0;
+  private walkPhase = 0;
+  private deadT = 0;
+  private flashTimer = 0;
   private radius = 0.42;
   private height = 1.85;
 
@@ -41,19 +65,63 @@ export class Bot {
     private slot: number,
     private nav: NavGrid,
   ) {
-    this.torso = new THREE.Mesh(torsoGeo, torsoMat);
+    this.torso = new THREE.Mesh(geo.torso, mat.torso);
     this.torso.position.y = 1.16;
-    this.legs = new THREE.Mesh(legsGeo, legsMat);
-    this.legs.position.y = 0.37;
-    this.head = new THREE.Mesh(headGeo, headMat);
+
+    const hips = new THREE.Mesh(geo.hips, mat.hips);
+    hips.position.y = 0.82;
+
+    this.legL = new THREE.Mesh(geo.leg, mat.leg);
+    this.legL.position.set(-0.13, 0.39, 0);
+    this.legR = new THREE.Mesh(geo.leg, mat.leg);
+    this.legR.position.set(0.13, 0.39, 0);
+
+    this.head = new THREE.Mesh(geo.head, mat.head);
     this.head.position.y = 1.68;
+    const helmet = new THREE.Mesh(geo.helmet, mat.helmet);
+    helmet.position.y = 0.12;
+    this.head.add(helmet);
+
+    this.armL = new THREE.Mesh(geo.arm, mat.arm);
+    this.armL.position.set(-0.36, 1.2, -0.12);
+    this.armL.rotation.x = -0.9;
+    this.armR = new THREE.Mesh(geo.arm, mat.arm);
+    this.armR.position.set(0.34, 1.18, -0.05);
+    this.armR.rotation.x = -1.05;
+
+    this.gun = new THREE.Mesh(geo.gun, mat.gun);
+    this.gun.position.set(0.2, 1.12, -0.42);
+
+    const flashMat = new THREE.MeshBasicMaterial({
+      color: 0xffd68a,
+      transparent: true,
+      opacity: 0,
+      depthWrite: false,
+      blending: THREE.AdditiveBlending,
+    });
+    this.flash = new THREE.Mesh(new THREE.PlaneGeometry(0.3, 0.3), flashMat);
+    this.flash.position.set(0.2, 1.14, -0.76);
+    this.flash.visible = false;
+
+    this.root.add(
+      this.torso,
+      hips,
+      this.legL,
+      this.legR,
+      this.head,
+      this.armL,
+      this.armR,
+      this.gun,
+      this.flash,
+    );
+    this.group.add(this.root);
 
     this.torso.userData = { bot: this, part: 'body' };
-    this.legs.userData = { bot: this, part: 'body' };
     this.head.userData = { bot: this, part: 'head' };
+    this.legL.userData = { bot: this, part: 'body' };
+    this.legR.userData = { bot: this, part: 'body' };
+    this.hitMeshes.push(this.torso, this.head, this.legL, this.legR);
 
-    this.group.add(this.torso, this.legs, this.head);
-    this.hitMeshes.push(this.torso, this.legs, this.head);
     this.group.visible = false;
   }
 
@@ -62,24 +130,28 @@ export class Bot {
   }
 
   spawn(playerPos: THREE.Vector3): void {
-    // farthest spawns first, then hand out different ones per bot slot
     const sorted = [...this.spawns].sort(
       (a, b) => b.distanceToSquared(playerPos) - a.distanceToSquared(playerPos),
     );
     const best = sorted[this.slot % sorted.length];
     this.pos.copy(best);
-    this.pos.x += (Math.random() - 0.5) * 2.5;
-    this.pos.z += (Math.random() - 0.5) * 2.5;
+    this.pos.x += (Math.random() - 0.5) * 1.6;
+    this.pos.z += (Math.random() - 0.5) * 1.6;
     this.vel.set(0, 0, 0);
     this.hp = BOT_HP;
     this.alive = true;
+    this.deadT = 0;
     this.group.visible = true;
+    this.root.rotation.set(0, 0, 0);
+    this.root.position.set(0, 0, 0);
     this.group.position.copy(this.pos);
-    this.fireCd = 0.6 + Math.random();
+    this.fireCd = 0.7 + Math.random() * 0.8;
     this.stuckTime = 0;
     this.lastPos.copy(this.pos);
     this.path = [];
     this.pathTimer = 0;
+    this.yaw = Math.random() * Math.PI * 2;
+    this.targetYaw = this.yaw;
   }
 
   takeDamage(amount: number): boolean {
@@ -87,8 +159,8 @@ export class Bot {
     this.hp -= amount;
     if (this.hp <= 0) {
       this.alive = false;
-      this.group.visible = false;
-      this.respawnTimer = 3.5;
+      this.deadT = 0;
+      this.respawnTimer = DEATH_TIME + 1.2;
       return true;
     }
     return false;
@@ -101,8 +173,16 @@ export class Bot {
     onShoot: (from: THREE.Vector3, to: THREE.Vector3) => void,
   ): void {
     if (!this.alive) {
+      this.deadT = Math.min(1, this.deadT + dt * 2.4);
+      const t = this.deadT;
+      this.root.rotation.x = -t * 1.45;
+      this.root.position.y = -t * 0.35;
+      this.flash.visible = false;
       this.respawnTimer -= dt;
-      if (this.respawnTimer <= 0) this.spawn(player.pos);
+      if (this.respawnTimer <= 0) {
+        this.group.visible = false;
+        this.spawn(player.pos);
+      }
       return;
     }
 
@@ -112,7 +192,15 @@ export class Bot {
     const los =
       player.alive &&
       dist < 48 &&
-      hasLineOfSight(this.pos.x, this.eyeY, this.pos.z, player.pos.x, player.eyeY, player.pos.z, colliders);
+      hasLineOfSight(
+        this.pos.x,
+        this.eyeY,
+        this.pos.z,
+        player.pos.x,
+        player.eyeY,
+        player.pos.z,
+        colliders,
+      );
 
     // --- movement -------------------------------------------------
     let mx = 0;
@@ -176,7 +264,6 @@ export class Bot {
       this.vel.y = 0;
     }
 
-    // stuck detection
     const moved = Math.hypot(this.pos.x - this.lastPos.x, this.pos.z - this.lastPos.z);
     if (moved < 0.006 && Math.hypot(mx, mz) > 0.3) {
       if (this.stuckTime <= 0) {
@@ -186,13 +273,37 @@ export class Bot {
     }
     this.lastPos.copy(this.pos);
 
+    // --- animation -------------------------------------------------
+    const moveSpeed = Math.hypot(this.vel.x, this.vel.z);
+    this.walkPhase += dt * (2.2 + moveSpeed * 1.9);
+    const swing = Math.min(1, moveSpeed / 3) * 0.7;
+    this.legL.rotation.x = Math.sin(this.walkPhase) * swing;
+    this.legR.rotation.x = -Math.sin(this.walkPhase) * swing;
+    this.torso.position.y = 1.16 + Math.abs(Math.cos(this.walkPhase)) * 0.02 * swing;
+
+    this.targetYaw = Math.atan2(dx, dz);
+    let diff = this.targetYaw - this.yaw;
+    while (diff > Math.PI) diff -= Math.PI * 2;
+    while (diff < -Math.PI) diff += Math.PI * 2;
+    this.yaw += diff * Math.min(1, dt * 7);
+
     this.group.position.copy(this.pos);
-    this.group.rotation.y = Math.atan2(dx, dz);
+    this.group.rotation.y = this.yaw;
+
+    if (this.flashTimer > 0) {
+      this.flashTimer -= dt;
+      if (this.flashTimer <= 0) this.flash.visible = false;
+    }
 
     // --- shooting -------------------------------------------------
     this.fireCd -= dt;
     if (los && player.alive && dist < 34 && this.fireCd <= 0) {
       this.fireCd = 0.55 + Math.random() * 0.75;
+      this.flash.visible = true;
+      this.flash.rotation.z = Math.random() * Math.PI;
+      (this.flash.material as THREE.MeshBasicMaterial).opacity = 1;
+      this.flashTimer = 0.06;
+
       const from = new THREE.Vector3(this.pos.x, this.eyeY - 0.1, this.pos.z);
       const accuracy = Math.max(0.16, 0.62 - dist * 0.015);
       const hit = Math.random() < accuracy;
@@ -209,13 +320,15 @@ export class Bot {
 
 export class BotManager {
   bots: Bot[] = [];
+  private scene: THREE.Scene;
+  private spawns: THREE.Vector3[];
+  private nav: NavGrid;
 
   constructor(scene: THREE.Scene, spawns: THREE.Vector3[], count: number, nav: NavGrid) {
-    for (let i = 0; i < count; i++) {
-      const bot = new Bot(spawns, i, nav);
-      scene.add(bot.group);
-      this.bots.push(bot);
-    }
+    this.scene = scene;
+    this.spawns = spawns;
+    this.nav = nav;
+    this.setCount(count);
   }
 
   get meshes(): THREE.Mesh[] {
@@ -226,6 +339,18 @@ export class BotManager {
 
   get aliveCount(): number {
     return this.bots.filter((b) => b.alive).length;
+  }
+
+  setCount(count: number): void {
+    while (this.bots.length > count) {
+      const b = this.bots.pop()!;
+      this.scene.remove(b.group);
+    }
+    while (this.bots.length < count) {
+      const b = new Bot(this.spawns, this.bots.length, this.nav);
+      this.scene.add(b.group);
+      this.bots.push(b);
+    }
   }
 
   reset(playerPos: THREE.Vector3): void {
@@ -243,7 +368,6 @@ export class BotManager {
   ): void {
     for (const b of this.bots) b.update(dt, player, colliders, onShoot);
 
-    // keep bots from standing inside each other
     for (let i = 0; i < this.bots.length; i++) {
       const a = this.bots[i];
       if (!a.alive) continue;
