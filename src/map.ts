@@ -30,7 +30,7 @@ const C = {
   wood: 0x96652f,
   woodDark: 0x6b4420,
   metal: 0x4c525a,
-  blue: 0x466d8c,
+  blue: 0x5b86a8,
   rust: 0x8a4a34,
   barrel: 0x6f5a34,
 };
@@ -194,7 +194,7 @@ class Builder {
   ): void {
     const g0 = gapCenter - gapWidth / 2;
     const g1 = gapCenter + gapWidth / 2;
-    const hh = h - 0.04;
+    const hh = h;
     if (axis === 'x') {
       this.box(x1, z1, g0, z2, 0, hh, C.stone, true);
       this.box(g1, z1, x2, z2, 0, hh, C.stone, true);
@@ -335,6 +335,7 @@ export function buildMap(): MapData {
   const floorCol: number[] = [];
   const floorUv: number[] = [];
   const floorIdx: number[] = [];
+
   const zoneColor = (ix: number, iz: number): number => {
     const x = MAP_MIN + ix + 0.5;
     const z = MAP_MIN + iz + 0.5;
@@ -344,28 +345,111 @@ export function buildMap(): MapData {
     return C.sand;
   };
 
+  // smooth ambient occlusion field (bilinear) so neighbouring tiles blend
+  const aoGrid = new Float32Array(MAP_SIZE * MAP_SIZE);
+  for (let i = 0; i < aoGrid.length; i++) {
+    aoGrid[i] = 0.8 + 0.05 * Math.min(4, dist[i]);
+  }
+  const aoAt = (x: number, z: number): number => {
+    const fx = x - MAP_MIN - 0.5;
+    const fz = z - MAP_MIN - 0.5;
+    const ix = Math.floor(fx);
+    const iz = Math.floor(fz);
+    const tx = fx - ix;
+    const tz = fz - iz;
+    let sum = 0;
+    let wsum = 0;
+    const taps: [number, number, number][] = [
+      [0, 0, (1 - tx) * (1 - tz)],
+      [1, 0, tx * (1 - tz)],
+      [0, 1, (1 - tx) * tz],
+      [1, 1, tx * tz],
+    ];
+    for (const [dx, dz, wt] of taps) {
+      const cx2 = ix + dx;
+      const cz2 = iz + dz;
+      if (cx2 < 0 || cz2 < 0 || cx2 >= MAP_SIZE || cz2 >= MAP_SIZE) continue;
+      const i2 = cz2 * MAP_SIZE + cx2;
+      if (!walkable[i2]) continue;
+      sum += aoGrid[i2] * wt;
+      wsum += wt;
+    }
+    return wsum > 0 ? sum / wsum : 0.84;
+  };
+
   const tmpColor = new THREE.Color();
+  const pushQuad = (
+    ax: number, ay: number, az: number,
+    bx: number, by: number, bz: number,
+    cx: number, cy: number, cz: number,
+    dx: number, dy: number, dz: number,
+    col: THREE.Color,
+  ) => {
+    const base = floorPos.length / 3;
+    floorPos.push(ax, ay, az, bx, by, bz, cx, cy, cz, dx, dy, dz);
+    for (let k = 0; k < 4; k++) floorCol.push(col.r, col.g, col.b);
+    floorUv.push(
+      ax * 0.24, az * 0.24,
+      bx * 0.24, bz * 0.24,
+      cx * 0.24, cz * 0.24,
+      dx * 0.24, dz * 0.24,
+    );
+    floorIdx.push(base, base + 1, base + 2, base, base + 2, base + 3);
+  };
+
+  // ---- floor tiles (per-vertex colour = zone tint * smooth AO) ----
   for (let iz = 0; iz < MAP_SIZE; iz++) {
     for (let ix = 0; ix < MAP_SIZE; ix++) {
       if (solidAt(ix, iz)) continue;
       const x0 = MAP_MIN + ix;
       const z0 = MAP_MIN + iz;
       const y0 = heights[iz * MAP_SIZE + ix];
-      const d = Math.min(4, dist[iz * MAP_SIZE + ix]);
-      const ao = 0.8 + 0.05 * d;
-
-      tmpColor.setHex(zoneColor(ix, iz)).multiplyScalar(ao * (0.97 + Math.random() * 0.06));
-
       const base = floorPos.length / 3;
-      floorPos.push(
-        x0, y0, z0,
-        x0 + 1, y0, z0,
-        x0 + 1, y0, z0 + 1,
-        x0, y0, z0 + 1,
-      );
-      for (let k = 0; k < 4; k++) floorCol.push(tmpColor.r, tmpColor.g, tmpColor.b);
-      floorUv.push(x0 * 0.24, z0 * 0.24, (x0 + 1) * 0.24, z0 * 0.24, (x0 + 1) * 0.24, (z0 + 1) * 0.24, x0 * 0.24, (z0 + 1) * 0.24);
+
+      const corners: [number, number][] = [
+        [x0, z0],
+        [x0 + 1, z0],
+        [x0 + 1, z0 + 1],
+        [x0, z0 + 1],
+      ];
+      for (const [cx2, cz2] of corners) {
+        floorPos.push(cx2, y0, cz2);
+        tmpColor.setHex(zoneColor(ix, iz)).multiplyScalar(aoAt(cx2, cz2));
+        floorCol.push(tmpColor.r, tmpColor.g, tmpColor.b);
+        floorUv.push(cx2 * 0.24, cz2 * 0.24);
+      }
       floorIdx.push(base, base + 2, base + 1, base, base + 3, base + 2);
+    }
+  }
+
+  // ---- vertical risers wherever two walkable tiles differ in height ----
+  const riserColor = new THREE.Color();
+  for (let iz = 0; iz < MAP_SIZE; iz++) {
+    for (let ix = 0; ix < MAP_SIZE; ix++) {
+      if (solidAt(ix, iz)) continue;
+      const h = heights[iz * MAP_SIZE + ix];
+      const x0 = MAP_MIN + ix;
+      const z0 = MAP_MIN + iz;
+      const x1 = x0 + 1;
+      const z1 = z0 + 1;
+      riserColor.setHex(zoneColor(ix, iz)).multiplyScalar(0.82);
+
+      const nH = iz > 0 && !solidAt(ix, iz - 1) ? heights[(iz - 1) * MAP_SIZE + ix] : h;
+      if (nH < h - 0.001) {
+        pushQuad(x0, h, z0, x1, h, z0, x1, nH, z0, x0, nH, z0, riserColor);
+      }
+      const sH = iz < MAP_SIZE - 1 && !solidAt(ix, iz + 1) ? heights[(iz + 1) * MAP_SIZE + ix] : h;
+      if (sH < h - 0.001) {
+        pushQuad(x1, h, z1, x0, h, z1, x0, sH, z1, x1, sH, z1, riserColor);
+      }
+      const eH = ix < MAP_SIZE - 1 && !solidAt(ix + 1, iz) ? heights[iz * MAP_SIZE + ix + 1] : h;
+      if (eH < h - 0.001) {
+        pushQuad(x1, h, z0, x1, h, z1, x1, eH, z1, x1, eH, z0, riserColor);
+      }
+      const wH = ix > 0 && !solidAt(ix - 1, iz) ? heights[iz * MAP_SIZE + ix - 1] : h;
+      if (wH < h - 0.001) {
+        pushQuad(x0, h, z1, x0, h, z0, x0, wH, z0, x0, wH, z1, riserColor);
+      }
     }
   }
 
@@ -417,7 +501,8 @@ export function buildMap(): MapData {
       const baseCol = (ix + iz) % 7 === 0 ? C.stoneLow : C.stone;
       const col = tintBySide(baseCol, worldZ);
       b.box(x1, z1, x1 + w, z1 + h, -2.5, WALL_H - 0.35, col, true, 0.2);
-      b.box(x1, z1, x1 + w, z1 + h, WALL_H - 0.35, WALL_H, C.stoneLow, false, 0.2);
+      // cornice: overhangs the wall so no face is coplanar with it
+      b.box(x1 - 0.04, z1 - 0.04, x1 + w + 0.04, z1 + h + 0.04, WALL_H - 0.32, WALL_H + 0.03, C.stoneLow, false, 0.2);
     }
   }
 
@@ -425,8 +510,7 @@ export function buildMap(): MapData {
   b.doorWall(16, 13.2, 27, 14.4, 'x', 21.5, 5, WALL_H, 4.6); // long doors
   b.doorWall(-4.4, 2.5, 4.4, 3.7, 'x', 0, 3.2, WALL_H, 4.8); // mid doors
   b.doorWall(-23, -1.2, -15, 0, 'x', -19, 3.4, WALL_H, 4.4); // B doors
-  b.doorWall(6, -22.4, 14, -21.2, 'x', 10, 3.6, WALL_H, 4.4); // CT -> A arch
-  b.doorWall(-15, -22.4, -6, -21.2, 'x', -10.5, 3.6, WALL_H, 4.4); // CT -> B arch
+
 
   // ---- tunnel ceilings -------------------------------------------------
   b.ceiling(-23, -7, -15, 23, 4.3);
@@ -450,9 +534,9 @@ export function buildMap(): MapData {
 
   // ---- long ------------------------------------------------------------
   b.box(20, -1.2, 23.2, 1.4, 0, 1.35, C.metal); // the car
-  b.box(20.2, -0.9, 23.0, 1.1, 1.35, 1.62, 0x3c424a, false);
+  b.box(20.2, -0.9, 23.0, 1.1, 1.35, 1.62, 0x4a525c, false);
   b.box(22.5, 5.4, 26.8, 9.4, 0, 2.7, C.blue); // blue container
-  b.box(22.5, 5.4, 26.8, 9.4, 2.7, 2.82, 0x2c4762, false);
+  b.box(22.5, 5.4, 26.8, 9.4, 2.7, 2.82, 0x3d5f80, false);
   b.crate(19, 10, 2.0);
   b.crate(25.2, -3.6, 1.9);
   b.box(18, 4, 19.2, 6.2, 0, 0.95, C.sandDark); // sandbags
@@ -464,7 +548,7 @@ export function buildMap(): MapData {
 
   // ---- short / catwalk -------------------------------------------------
   b.crate(6.5, -9.5, 1.7);
-  b.box(2.2, -5.4, 3.0, -2.6, 0, 0.95, C.sandDark);
+  b.box(3.6, -7.6, 4.4, -5.8, 0, 0.95, C.sandDark);
 
   // ---- tunnels ---------------------------------------------------------
   b.crate(-19, 9, 1.9);
@@ -485,7 +569,7 @@ export function buildMap(): MapData {
 
   // ---- extra cover -----------------------------------------------------
   b.crate(23.5, 11.5, 1.8);
-  b.crate(-23.5, 4, 1.8);
+  b.crate(-21.4, 4, 1.8);
   b.crate(9.5, 1.5, 1.6);
   b.barrel(16.5, -19.5);
 

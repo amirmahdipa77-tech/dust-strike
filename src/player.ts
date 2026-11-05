@@ -31,6 +31,7 @@ export class Player {
   private bobTime = 0;
   private bobOffset = 0;
   private fallSpeed = 0;
+  private landDip = 0;
 
   respawn(at: THREE.Vector3): void {
     this.pos.copy(at);
@@ -104,7 +105,10 @@ export class Player {
     const wasAir = !this.onGround;
     if (this.pos.y <= ground + 0.001 && this.vel.y <= 0) {
       this.pos.y = ground;
-      if (wasAir && this.fallSpeed < -4.5) this.landed = true;
+      if (wasAir && this.fallSpeed < -4.5) {
+        this.landed = true;
+        this.landDip = Math.min(1, -this.fallSpeed / 9);
+      }
       this.vel.y = 0;
       this.fallSpeed = 0;
       this.onGround = true;
@@ -149,12 +153,13 @@ export class Player {
     return false;
   }
 
-  syncCamera(camera: THREE.PerspectiveCamera, recoilPitch: number, shake = 0): void {
+  syncCamera(camera: THREE.PerspectiveCamera, recoilPitch: number, shake = 0, dt = 0.016): void {
+    this.landDip *= Math.max(0, 1 - dt * 7);
     const shakeX = shake > 0 ? (Math.random() - 0.5) * shake * 0.012 : 0;
     const shakeY = shake > 0 ? (Math.random() - 0.5) * shake * 0.012 : 0;
     const deadRoll = this.deathTilt * 1.2;
 
-    camera.position.set(this.pos.x, this.eyeY - this.deathTilt * 1.1, this.pos.z);
+    camera.position.set(this.pos.x, this.eyeY - this.deathTilt * 1.1 - this.landDip * 0.16, this.pos.z);
     camera.rotation.set(
       this.pitch + recoilPitch + shakeY,
       this.yaw + shakeX,

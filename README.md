@@ -1,10 +1,19 @@
-# DUST STRIKE — v6
+# DUST STRIKE — v7
 
 A light, fast CS-style mobile FPS in **TypeScript + Three.js**, packaged for Android with **Capacitor** and built by **GitHub Actions**.
 
 - **Engine:** Three.js (WebGL), no game-engine runtime — ~600 KB of JS, zero external assets
 - **Shell:** Capacitor 7 → Android (landscape, immersive fullscreen)
 - **APK:** built automatically on every push to `main` (and attached to releases on tags)
+
+## Geometry & animation pass (v7)
+
+- **No seams.** Floor tiles share a bilinearly-sampled ambient-occlusion field, so neighbouring tiles blend instead of showing a 1 m checkerboard.
+- **No holes.** Every height change now emits a vertical riser quad, so the pit, the A goose platform, the B back platform and all stairs are watertight from every angle.
+- **No z-fighting.** Wall tops carry a cornice that overhangs the wall body (no coplanar faces), doorway walls are full height (the old 4 cm slit that leaked sky is gone), and the far ground plane sits below the pit instead of cutting through it.
+- **No floating props.** Colliders were audited pairwise for overlap; crates that clipped into walls or into each other were moved, and two free-standing arch walls that read as broken geometry were removed.
+- **Weapon never clips.** The viewmodel renders in its own scene pass with a cleared depth buffer, so standing against a wall no longer shows the gun through it.
+- **Animation.** Bots flinch on hit, swing their arms while running and drop their head; the player camera dips on landing; recoil and switch animations were re-timed.
 
 ## Competitive mode (v6)
 

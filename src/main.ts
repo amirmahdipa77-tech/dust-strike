@@ -45,7 +45,7 @@ scene.fog = new THREE.Fog(SKY_HORIZON, 42, 118);
 const camera = new THREE.PerspectiveCamera(settings.fov, window.innerWidth / window.innerHeight, 0.05, 220);
 scene.add(camera);
 
-scene.add(new THREE.HemisphereLight(0xfffaf0, 0xb3a486, 1.25));
+scene.add(new THREE.HemisphereLight(0xfffaf0, 0xc0b193, 1.35));
 
 // warm fill lights for the enclosed tunnels and B site
 for (const [x, y, z, intensity, dist] of [
@@ -95,13 +95,22 @@ scene.add(map.mesh);
   const g = new THREE.PlaneGeometry(400, 400);
   g.rotateX(-Math.PI / 2);
   const ground = new THREE.Mesh(g, new THREE.MeshLambertMaterial({ color: 0xb59d74 }));
-  ground.position.y = -0.15;
+  ground.position.y = -2.6;
   scene.add(ground);
 }
 
 const player = new Player();
 const weapon = new Weapons();
-camera.add(weapon.group);
+
+// the viewmodel lives in its own scene so it never clips into walls
+const viewScene = new THREE.Scene();
+const viewCamera = new THREE.PerspectiveCamera(settings.fov, window.innerWidth / window.innerHeight, 0.01, 6);
+viewScene.add(viewCamera);
+viewScene.add(new THREE.HemisphereLight(0xfff8ee, 0xb8ab8e, 1.6));
+const viewSun = new THREE.DirectionalLight(0xfff2d8, 1.5);
+viewSun.position.set(0.6, 1.4, 0.8);
+viewScene.add(viewSun);
+viewCamera.add(weapon.group);
 
 player.terrain = map.heightAt;
 
@@ -600,6 +609,8 @@ const settingsUI = new SettingsUI(() => {
 function applySettings(): void {
   camera.fov = settings.fov;
   camera.updateProjectionMatrix();
+  viewCamera.fov = settings.fov;
+  viewCamera.updateProjectionMatrix();
   currentPR = basePR * settings.resolution;
   resize();
   hud.applySettings();
@@ -696,7 +707,8 @@ function playerShoot(): { fired: boolean; hit: string | null } {
     end = origin.clone().addScaledVector(tmpDir, 80);
   }
 
-  const muzzle = weapon.group.localToWorld(weapon.muzzleLocal.clone());
+  const muzzle = weapon.muzzleLocal.clone().multiplyScalar(weapon.model.scale).add(weapon.model.base);
+  camera.localToWorld(muzzle);
   tracers.fire(muzzle, end);
 
   if (online) {
@@ -753,6 +765,9 @@ function resize(): void {
   const h = window.innerHeight;
   camera.aspect = w / h;
   camera.updateProjectionMatrix();
+  viewCamera.aspect = w / h;
+  viewCamera.fov = camera.fov;
+  viewCamera.updateProjectionMatrix();
   renderer.setPixelRatio(currentPR);
   renderer.setSize(w, h, false);
 }
@@ -811,7 +826,7 @@ function stepCombat(dt: number): void {
   if (input.consumeReload()) weapon.startReload();
   if (input.firing) playerShoot();
 
-  player.syncCamera(camera, weapon.recoilPitch, weapon.shake);
+  player.syncCamera(camera, weapon.recoilPitch, weapon.shake, dt);
   camera.updateMatrixWorld(true);
 
   hud.setAmmo(weapon.mag, weapon.reserve, weapon.reloading);
@@ -919,7 +934,7 @@ function animate(): void {
     deadTimer -= dt;
     el.deadTimer.textContent = String(Math.max(0, Math.ceil(deadTimer)));
     player.update(dt, input, map.colliders);
-    player.syncCamera(camera, 0, 0);
+    player.syncCamera(camera, 0, 0, dt);
     weapon.update({ dt, speed: 0, onGround: true, crouch: false, lookDX: 0, lookDY: 0, landed: false });
     if (!online) {
       bots.update(dt, player, map.colliders, onBotShoot);
@@ -945,7 +960,13 @@ function animate(): void {
     hud.update(dt);
   }
 
+  renderer.autoClear = false;
+  renderer.clear();
   renderer.render(scene, camera);
+  if (weapon.group.visible) {
+    renderer.clearDepth();
+    renderer.render(viewScene, viewCamera);
+  }
 }
 
 // ---------------------------------------------------------------- wiring

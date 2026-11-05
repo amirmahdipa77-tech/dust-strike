@@ -56,6 +56,7 @@ export class Bot {
   private path: { x: number; z: number }[] = [];
   private pathTimer = 0;
   private walkPhase = 0;
+  private flinch = 0;
   private deadT = 0;
   private flashTimer = 0;
   goal: { x: number; z: number } | null = null;
@@ -160,6 +161,7 @@ export class Bot {
   takeDamage(amount: number): boolean {
     if (!this.alive) return false;
     this.hp -= amount;
+    this.flinch = Math.min(1, this.flinch + 0.9);
     if (this.hp <= 0) {
       this.alive = false;
       this.deadT = 0;
@@ -289,6 +291,13 @@ export class Bot {
     this.legL.rotation.x = Math.sin(this.walkPhase) * swing;
     this.legR.rotation.x = -Math.sin(this.walkPhase) * swing;
     this.torso.position.y = 1.16 + Math.abs(Math.cos(this.walkPhase)) * 0.02 * swing;
+
+    // arms counter-swing + hit flinch
+    this.flinch *= Math.max(0, 1 - dt * 6);
+    this.armL.rotation.x = -0.9 + Math.sin(this.walkPhase) * 0.18 * swing;
+    this.armR.rotation.x = -1.05 - Math.sin(this.walkPhase) * 0.12 * swing;
+    this.torso.rotation.x = -this.flinch * 0.28;
+    this.head.rotation.x = -this.flinch * 0.18;
 
     this.targetYaw = Math.atan2(dx, dz);
     let diff = this.targetYaw - this.yaw;
