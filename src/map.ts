@@ -1,6 +1,16 @@
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import type { Collider } from './collision';
+import {
+  sandTexture,
+  plasterTexture,
+  stoneTexture,
+  woodTexture,
+  metalTexture,
+  containerTexture,
+} from './textures';
+
+export type MatId = 'sand' | 'plaster' | 'stone' | 'wood' | 'metal' | 'container';
 
 /**
  * DUST — a grid-painted recreation of the classic dust2 layout.
@@ -37,6 +47,7 @@ const C = {
 
 export interface MapData {
   mesh: THREE.Mesh;
+  meshes: THREE.Mesh[];
   colliders: Collider[];
   walkable: Uint8Array;
   heightAt: (x: number, z: number) => number;
@@ -45,40 +56,16 @@ export interface MapData {
 }
 
 // ---------------------------------------------------------------- textures
-function noiseTexture(size: number, base: [number, number, number], grain: number): THREE.Texture {
-  const cv = document.createElement('canvas');
-  cv.width = cv.height = size;
-  const ctx = cv.getContext('2d')!;
-  ctx.fillStyle = `rgb(${base[0]},${base[1]},${base[2]})`;
-  ctx.fillRect(0, 0, size, size);
-
-  for (let i = 0; i < 260; i++) {
-    const a = 0.015 + Math.random() * 0.03;
-    ctx.fillStyle = Math.random() > 0.5 ? `rgba(120,100,72,${a})` : `rgba(250,240,218,${a})`;
-    const w = 20 + Math.random() * 60;
-    ctx.fillRect(Math.random() * size, Math.random() * size, w, 1 + Math.random() * 2);
-  }
-
-  const img = ctx.getImageData(0, 0, size, size);
-  const d = img.data;
-  for (let i = 0; i < d.length; i += 4) {
-    const n = (Math.random() - 0.5) * grain;
-    d[i] = Math.max(0, Math.min(255, d[i] + n));
-    d[i + 1] = Math.max(0, Math.min(255, d[i + 1] + n * 0.96));
-    d[i + 2] = Math.max(0, Math.min(255, d[i + 2] + n * 0.84));
-  }
-  ctx.putImageData(img, 0, 0);
-
-  const tex = new THREE.CanvasTexture(cv);
-  tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
-  tex.colorSpace = THREE.SRGBColorSpace;
-  tex.anisotropy = 4;
-  return tex;
-}
-
 // ---------------------------------------------------------------- builder
 class Builder {
-  geos: THREE.BufferGeometry[] = [];
+  geos: Record<MatId, THREE.BufferGeometry[]> = {
+    sand: [],
+    plaster: [],
+    stone: [],
+    wood: [],
+    metal: [],
+    container: [],
+  };
   colliders: Collider[] = [];
 
   private paintGeo(g: THREE.BufferGeometry, color: number, y0: number, y1: number): void {
@@ -108,6 +95,7 @@ class Builder {
     color: number,
     solid = true,
     uvScale = 0.22,
+    mat: MatId = 'plaster',
   ): void {
     const w = Math.abs(x2 - x1);
     const d = Math.abs(z2 - z1);
@@ -127,7 +115,7 @@ class Builder {
       );
     }
     this.paintGeo(g, color, y0, y1);
-    this.geos.push(g);
+    this.geos[mat].push(g);
 
     if (solid) {
       this.colliders.push({
@@ -144,9 +132,9 @@ class Builder {
   /** Crate with a darker band so it reads as a box, not a cube. */
   crate(cx: number, cz: number, size = 2, h = 1.0, y0 = 0): void {
     const s = size / 2;
-    this.box(cx - s, cz - s, cx + s, cz + s, y0, y0 + h, C.wood, true, 0.5);
-    this.box(cx - s, cz - s, cx + s, cz + s, y0, y0 + h * 0.18, C.woodDark, false, 0.5);
-    this.box(cx - s, cz - s, cx + s, cz + s, y0 + h * 0.94, y0 + h, C.woodDark, false, 0.5);
+    this.box(cx - s, cz - s, cx + s, cz + s, y0, y0 + h, 0xf6ecdc, true, 0.5, 'wood');
+    this.box(cx - s, cz - s, cx + s, cz + s, y0, y0 + h * 0.18, 0xc9b191, false, 0.5, 'wood');
+    this.box(cx - s, cz - s, cx + s, cz + s, y0 + h * 0.94, y0 + h, 0xc9b191, false, 0.5, 'wood');
   }
 
   stacked(cx: number, cz: number, size = 2): void {
@@ -154,7 +142,7 @@ class Builder {
     this.crate(cx + 0.15, cz - 0.12, size * 0.8, 0.9, 1.0);
   }
 
-  barrel(cx: number, cz: number, color = C.barrel): void {
+  barrel(cx: number, cz: number, color = 0xdcd4c8): void {
     const g = new THREE.CylinderGeometry(0.45, 0.45, 1.1, 12, 1);
     g.translate(cx, 0.55, cz);
     const pos = g.attributes.position;
@@ -163,7 +151,7 @@ class Builder {
       uv.setXY(i, (pos.getX(i) + pos.getZ(i)) * 0.4, pos.getY(i) * 0.4);
     }
     this.paintGeo(g, color, 0, 1.1);
-    this.geos.push(g);
+    this.geos.metal.push(g);
     this.colliders.push({
       minX: cx - 0.45,
       maxX: cx + 0.45,
@@ -176,8 +164,8 @@ class Builder {
 
   /** Flat ceiling slab (no collider: bullets still stop, players pass under). */
   ceiling(x1: number, z1: number, x2: number, z2: number, y: number): void {
-    this.box(x1, z1, x2, z2, y, y + 0.35, C.stone, false, 0.2);
-    this.box(x1, z1, x2, z2, y - 0.06, y, C.stoneLight, false, 0.2);
+    this.box(x1, z1, x2, z2, y, y + 0.35, C.stone, false, 0.2, 'stone');
+    this.box(x1, z1, x2, z2, y - 0.06, y, C.stoneLight, false, 0.2, 'stone');
   }
 
   /** Wall with a doorway cut into it (used for mid doors / long doors). */
@@ -459,7 +447,7 @@ export function buildMap(): MapData {
   floorGeo.setAttribute('uv', new THREE.Float32BufferAttribute(floorUv, 2));
   floorGeo.setIndex(floorIdx);
   floorGeo.computeVertexNormals();
-  b.geos.push(floorGeo);
+  b.geos.sand.push(floorGeo);
 
   // ---- greedy-meshed walls -----------------------------------------
   const candidate = new Uint8Array(MAP_SIZE * MAP_SIZE);
@@ -500,9 +488,9 @@ export function buildMap(): MapData {
       const worldZ = MAP_MIN + iz + h / 2;
       const baseCol = (ix + iz) % 7 === 0 ? C.stoneLow : C.stone;
       const col = tintBySide(baseCol, worldZ);
-      b.box(x1, z1, x1 + w, z1 + h, -2.5, WALL_H - 0.35, col, true, 0.2);
+      b.box(x1, z1, x1 + w, z1 + h, -2.5, WALL_H - 0.35, col, true, 0.13);
       // cornice: overhangs the wall so no face is coplanar with it
-      b.box(x1 - 0.04, z1 - 0.04, x1 + w + 0.04, z1 + h + 0.04, WALL_H - 0.32, WALL_H + 0.03, C.stoneLow, false, 0.2);
+      b.box(x1 - 0.04, z1 - 0.04, x1 + w + 0.04, z1 + h + 0.04, WALL_H - 0.32, WALL_H + 0.03, C.stoneLow, false, 0.13);
     }
   }
 
@@ -533,10 +521,10 @@ export function buildMap(): MapData {
   b.barrel(-14, -8.6);
 
   // ---- long ------------------------------------------------------------
-  b.box(20, -1.2, 23.2, 1.4, 0, 1.35, C.metal); // the car
-  b.box(20.2, -0.9, 23.0, 1.1, 1.35, 1.62, 0x4a525c, false);
-  b.box(22.5, 5.4, 26.8, 9.4, 0, 2.7, C.blue); // blue container
-  b.box(22.5, 5.4, 26.8, 9.4, 2.7, 2.82, 0x3d5f80, false);
+  b.box(20, -1.2, 23.2, 1.4, 0, 1.35, 0xd7dde2, true, 0.4, 'metal'); // the car
+  b.box(20.2, -0.9, 23.0, 1.1, 1.35, 1.62, 0xa8b2ba, false, 0.4, 'metal');
+  b.box(22.5, 5.4, 26.8, 9.4, 0, 2.7, 0xe2ecf5, true, 0.32, 'container'); // blue container
+  b.box(22.5, 5.4, 26.8, 9.4, 2.7, 2.82, 0xb9c6d2, false, 0.32, 'container');
   b.crate(19, 10, 2.0);
   b.crate(25.2, -3.6, 1.9);
   b.box(18, 4, 19.2, 6.2, 0, 0.95, C.sandDark); // sandbags
@@ -574,16 +562,32 @@ export function buildMap(): MapData {
   b.barrel(16.5, -19.5);
 
   // ---- assemble -------------------------------------------------------
-  const merged = mergeGeometries(b.geos, false)!;
-  merged.computeBoundingSphere();
-  b.geos.forEach((g) => g.dispose());
+  const textures: Record<MatId, THREE.Texture> = {
+    sand: sandTexture(),
+    plaster: plasterTexture(),
+    stone: stoneTexture(),
+    wood: woodTexture(),
+    metal: metalTexture(),
+    container: containerTexture(),
+  };
 
-  const tex = noiseTexture(128, [206, 182, 141], 24);
-  const mesh = new THREE.Mesh(
-    merged,
-    new THREE.MeshLambertMaterial({ vertexColors: true, map: tex }),
-  );
-  mesh.frustumCulled = false;
+  const meshes: THREE.Mesh[] = [];
+  for (const key of Object.keys(b.geos) as MatId[]) {
+    const list = b.geos[key];
+    if (list.length === 0) continue;
+    const merged = mergeGeometries(list, false);
+    if (!merged) continue;
+    merged.computeBoundingSphere();
+    list.forEach((g) => g.dispose());
+    const mesh = new THREE.Mesh(
+      merged,
+      new THREE.MeshLambertMaterial({ vertexColors: true, map: textures[key] }),
+    );
+    mesh.frustumCulled = false;
+    mesh.name = key;
+    meshes.push(mesh);
+  }
+  const mesh = meshes[0];
 
   const heightAt = (x: number, z: number): number => {
     const ix = Math.floor(x - MAP_MIN);
@@ -595,6 +599,7 @@ export function buildMap(): MapData {
 
   return {
     mesh,
+    meshes,
     colliders: b.colliders,
     walkable,
     heightAt,

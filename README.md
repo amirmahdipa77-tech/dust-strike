@@ -1,10 +1,23 @@
-# DUST STRIKE — v7
+# DUST STRIKE — v8
 
 A light, fast CS-style mobile FPS in **TypeScript + Three.js**, packaged for Android with **Capacitor** and built by **GitHub Actions**.
 
 - **Engine:** Three.js (WebGL), no game-engine runtime — ~600 KB of JS, zero external assets
 - **Shell:** Capacitor 7 → Android (landscape, immersive fullscreen)
 - **APK:** built automatically on every push to `main` (and attached to releases on tags)
+
+## Materials & texture pass (v8)
+
+Everything is drawn on canvas at load time — still zero image assets, the APK stays at ~4.2 MB.
+
+- **Sand floor** — grain, soft tonal patches and pebbles.
+- **Aged plaster walls** — cream render with hairline cracks, chipped patches and tonal drift, exactly the dust2 look.
+- **Cut-stone masonry** for tunnel walls, ceilings and platforms.
+- **Planked wood** with grain streaks, plank gaps and nails for every crate.
+- **Rusted steel** with blooms and scratches for barrels, the car and containers; a separate **corrugated blue** map for the shipping containers.
+- The map is now split into **six merged meshes (one per material)** instead of one, so each surface carries the right texture and still costs only six draw calls.
+- **Bullet holes**: a 24-decal pool stamps soft impact marks on walls with correct surface normals, plus dust puffs.
+- Weapons use the same wood/steel textures, so the AK furniture is real wood grain and the receivers are brushed steel.
 
 ## Geometry & animation pass (v7)
 

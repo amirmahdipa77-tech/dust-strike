@@ -1,4 +1,10 @@
 import * as THREE from 'three';
+import { woodTexture, metalTexture } from './textures';
+
+const woodTex = woodTexture();
+const steelTex = metalTexture(256, '#6a7078');
+const lighten = (hex: number, t: number) =>
+  new THREE.Color(hex).lerp(new THREE.Color(0xffffff), t).getHex();
 
 /** Multi-weapon viewmodel: AK-47, M4A1, AWP, USP — with recoil, reload, switch and scope. */
 
@@ -360,9 +366,11 @@ export class Weapons {
 // ---------------------------------------------------------------- models
 function buildModel(def: WeaponDef): Model {
   const g = new THREE.Group();
-  const bodyMat = new THREE.MeshLambertMaterial({ color: def.body });
-  const accentMat = new THREE.MeshLambertMaterial({ color: def.accent });
-  const darkMat = new THREE.MeshLambertMaterial({ color: 0x14161a });
+  const bodyMat = new THREE.MeshLambertMaterial({ color: lighten(def.body, 0.55), map: steelTex });
+  const accentMat = def.wood
+    ? new THREE.MeshLambertMaterial({ color: 0xf0e2cc, map: woodTex })
+    : new THREE.MeshLambertMaterial({ color: lighten(def.accent, 0.5), map: steelTex });
+  const darkMat = new THREE.MeshLambertMaterial({ color: 0x2b2f36, map: steelTex });
   const glove = new THREE.MeshLambertMaterial({ color: 0x2b2a26 });
   const sleeve = new THREE.MeshLambertMaterial({ color: 0x4a4534 });
 
@@ -396,8 +404,8 @@ function buildModel(def: WeaponDef): Model {
     muzzleZ = -0.36;
   } else {
     const len = def.modelLen;
-    add(0.075, 0.115, 0.44, 0, 0, -0.16, bodyMat);
-    add(0.062, 0.045, 0.34, 0, 0.075, -0.18, accentMat);
+    add(0.068, 0.1, 0.46, 0, 0, -0.16, bodyMat);
+    add(0.056, 0.038, 0.36, 0, 0.068, -0.18, accentMat);
     add(0.05, 0.03, 0.1, 0, 0.055, -0.02, darkMat);
     add(0.034, 0.034, 0.46 * len, 0, 0.022, -0.55 * len, darkMat);
     add(0.03, 0.028, 0.22, 0, 0.062, -0.42, accentMat);
@@ -408,8 +416,8 @@ function buildModel(def: WeaponDef): Model {
     add(0.06, 0.06, 0.05, 0, -0.02, 0.34, darkMat);
     add(0.052, 0.14, 0.075, 0, -0.115, 0.03, darkMat);
 
-    mag = add(0.056, 0.2, 0.1, 0, -0.13, -0.1, def.wood ? accentMat : bodyMat);
-    mag.rotation.x = -0.12;
+    mag = add(0.052, 0.21, 0.095, 0, -0.135, -0.12, def.wood ? accentMat : bodyMat);
+    mag.rotation.x = -0.28;
     add(0.058, 0.09, 0.105, 0, -0.24, -0.13, darkMat, mag);
 
     bolt = add(0.035, 0.028, 0.05, 0.048, 0.03, -0.18, accentMat);

@@ -14,6 +14,7 @@ import { Net } from './net';
 import { Lobby } from './lobby';
 import { RemotePlayers } from './remote';
 import { Minimap } from './minimap';
+import { impactTexture } from './textures';
 import { Rounds, SITES } from './rounds';
 import { progress, addXp, isUnlocked, levelFor, xpInLevel, saveProgress } from './progress';
 
@@ -89,7 +90,7 @@ scene.add(sun);
 
 // ---------------------------------------------------------------- world
 const map = buildMap();
-scene.add(map.mesh);
+for (const m of map.meshes) scene.add(m);
 
 {
   const g = new THREE.PlaneGeometry(400, 400);
@@ -225,6 +226,52 @@ class TracerPool {
   }
 }
 const tracers = new TracerPool(scene, 14);
+
+// ---------------------------------------------------------------- bullet holes
+class DecalPool {
+  private items: { mesh: THREE.Mesh; life: number }[] = [];
+  private cursor = 0;
+
+  constructor(scene: THREE.Scene, count: number) {
+    const geo = new THREE.PlaneGeometry(0.22, 0.22);
+    const mat = new THREE.MeshBasicMaterial({
+      map: impactTexture(),
+      transparent: true,
+      depthWrite: false,
+      opacity: 0.9,
+      polygonOffset: true,
+      polygonOffsetFactor: -4,
+    });
+    for (let i = 0; i < count; i++) {
+      const mesh = new THREE.Mesh(geo, mat);
+      mesh.visible = false;
+      mesh.frustumCulled = false;
+      scene.add(mesh);
+      this.items.push({ mesh, life: 0 });
+    }
+  }
+
+  place(point: THREE.Vector3, normal: THREE.Vector3): void {
+    const item = this.items[this.cursor];
+    this.cursor = (this.cursor + 1) % this.items.length;
+    item.mesh.position.copy(point).addScaledVector(normal, 0.012);
+    item.mesh.lookAt(point.clone().add(normal));
+    item.mesh.rotateZ(Math.random() * Math.PI * 2);
+    const s = 0.8 + Math.random() * 0.5;
+    item.mesh.scale.set(s, s, s);
+    item.mesh.visible = true;
+    item.life = 25;
+  }
+
+  update(dt: number): void {
+    for (const i of this.items) {
+      if (i.life <= 0) continue;
+      i.life -= dt;
+      if (i.life <= 0) i.mesh.visible = false;
+    }
+  }
+}
+const decals = new DecalPool(scene, 24);
 
 // ---------------------------------------------------------------- dust motes
 const moteCount = 300;
@@ -658,7 +705,7 @@ function playerShoot(): { fired: boolean; hit: string | null } {
   tmpDir.normalize();
 
   raycaster.set(origin, tmpDir);
-  const targets = online ? [map.mesh, ...remotes.meshes] : [map.mesh, ...botMeshes];
+  const targets = online ? [...map.meshes, ...remotes.meshes] : [...map.meshes, ...botMeshes];
   const hits = raycaster.intersectObjects(targets, false);
 
   let end: THREE.Vector3;
@@ -702,6 +749,10 @@ function playerShoot(): { fired: boolean; hit: string | null } {
       spawnSparks(end, 3);
     } else {
       spawnSparks(end, 4);
+      if (hit.face) {
+        const n = hit.face.normal.clone().transformDirection(hit.object.matrixWorld);
+        decals.place(end, n);
+      }
     }
   } else {
     end = origin.clone().addScaledVector(tmpDir, 80);
@@ -955,6 +1006,7 @@ function animate(): void {
 
   if (state !== 'menu' && state !== 'lobby') {
     tracers.update(dt);
+    decals.update(dt);
     updateParticles(dt);
     motes.rotation.y += dt * 0.006;
     hud.update(dt);
